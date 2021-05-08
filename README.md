@@ -13,6 +13,7 @@
        # from clau_parser11::Reader, Writer.? - set_idx, enter, is_usertype, is_itemtype, back?quit?, 
        #                            get_name, get_value, set_name, set_value, get_idx, get_size?
        #                          default idx 0? make_itemtype, make_usertype.? insert?(anywhere?)
+       #                                new group, new item
        # tobool4?
        # find usertypes by /./dir1/dir2/ ...
        # get id for usertype ..
