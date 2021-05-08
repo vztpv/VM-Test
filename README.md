@@ -1,6 +1,6 @@
 # VM-Test
 
-# ClauScript++
+# ClauScript++ 구상
     $if, $else, # 조건문 
     $while, # 반복문
     $call, # 사용자 정의 이벤트 호출
