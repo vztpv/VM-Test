@@ -10,9 +10,9 @@
        # string operation.
        # edit_mode, shell_mode
        # lint, query
-       # from clau_parser::Reader, Writer.? - set_idx, enter, is_usertype, is_itemtype, back?quit?, 
+       # from clau_parser::Reader, Writer.? - set_idx, enter, is_group, is_item, back?quit?, 
        #                            get_name, get_value, set_name, set_value, get_idx, get_size?
-       #                          default idx 0? make_itemtype, make_usertype.? insert?(anywhere?)
+       #                          default idx 0? new_item, new_group.? insert?(anywhere?)
        #                                new group, new item
        # tobool4?
        # find usertypes by /./dir1/dir2/ ...
