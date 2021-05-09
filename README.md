@@ -28,10 +28,25 @@
 
 # ClauScript++ Example...
 
+        eu4 = {
+
+        }
+        eu4 = {
+
+        }
+        eu4 = ok 
+
         Event = {
             id = main
 
-            $call = { id = iterate event = test }
+            # load data from file.
+            $get = { /./eu4/$get_now }  # /dir/   /file
+
+            $while { $not_empty = { /$return_value } } {
+                $call = { id = iterate workspace = /$return_value/$enter event = test }
+
+                $pop_front = { /$return_value } # /$return_value/$pop_front
+            }
         }
 
         Event = {
@@ -92,5 +107,4 @@
                 $set_value = { /$parameter.iter "1444.1.1" }
             }
         }
-
 
