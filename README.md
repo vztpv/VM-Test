@@ -47,7 +47,7 @@
                 $if { /$parameter.workspace/$is_group } {
                     $call = { id = iterate workspace = /$parameter.workspace/$enter } # $enter = { } -> pair of UserType*, and long long
                 }
-                $set_idx = { /$parameter.workspace/$get_idx 1 }
+                $set_idx = { $add = { /$parameter.workspace/$get_idx 1 } }
             }
         }
 
