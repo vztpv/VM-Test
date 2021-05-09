@@ -40,7 +40,7 @@
         id = main
 
         # load data from file.
-        $get = { /./eu4/$get_now }  # /dir/   /file
+        $find = { /./eu4/ }  # /dir/   /file
 
         $while { $not_empty = { /$return_value } } {
             $call = { id = iterate workspace = /$return_value/$enter event = test }
@@ -52,7 +52,7 @@
     Event = {
         id = iterate
 
-        $parameter = { workspace = $root event } # recursive?
+        $parameter = { workspace event } # recursive?
 
         # $ <- 데이터영역?에서 $로 시작하지않는다. - 조건?
 
