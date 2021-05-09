@@ -28,83 +28,83 @@
 
 # ClauScript++ Example...
 
-        eu4 = {
+    eu4 = {
 
+    }
+    eu4 = {
+
+    }
+    eu4 = ok 
+
+    Event = {
+        id = main
+
+        # load data from file.
+        $get = { /./eu4/$get_now }  # /dir/   /file
+
+        $while { $not_empty = { /$return_value } } {
+            $call = { id = iterate workspace = /$return_value/$enter event = test }
+
+            $pop_front = { /$return_value } # /$return_value/$pop_front
         }
-        eu4 = {
+    }
 
-        }
-        eu4 = ok 
+    Event = {
+        id = iterate
 
-        Event = {
-            id = main
+        $parameter = { workspace = $root event } # recursive?
 
-            # load data from file.
-            $get = { /./eu4/$get_now }  # /dir/   /file
+        # $ <- 데이터영역?에서 $로 시작하지않는다. - 조건?
 
-            $while { $not_empty = { /$return_value } } {
-                $call = { id = iterate workspace = /$return_value/$enter event = test }
+        $if { $COMP< = { /$parameter.workspace/$get_idx /$parameter.workspace/$get_size } } {
+            $call = { id = $parameter.event iter = /$parameter.workspace/$get_now } # $get_now = { } -> pair of UserType*, and long long
 
-                $pop_front = { /$return_value } # /$return_value/$pop_front
+            $if { /$parameter.workspace/$is_group } {
+                $call = { id = iterate workspace = /$parameter.workspace/$enter } # $enter = { } -> pair of UserType*, and long long
             }
+            $set_idx = { /$parameter.workspace $add = { /$parameter.workspace/$get_idx 1 } }
         }
+    }
 
-        Event = {
-            id = iterate
+    Event = {
+        id = test
 
-            $parameter = { workspace = $root event } # recursive?
+        $parameter = { iter }	
 
-            # $ <- 데이터영역?에서 $로 시작하지않는다. - 조건?
-
-            $if { $COMP< = { /$parameter.workspace/$get_idx /$parameter.workspace/$get_size } } {
-                $call = { id = $parameter.event iter = /$parameter.workspace/$get_now } # $get_now = { } -> pair of UserType*, and long long
-
-                $if { /$parameter.workspace/$is_group } {
-                    $call = { id = iterate workspace = /$parameter.workspace/$enter } # $enter = { } -> pair of UserType*, and long long
+        $if { 
+                $AND_ALL = { 
+                    $NOT = { $is_quoted_str = { /$parameter.iter/$get_name } }			
+                    $COMP> = { /$parameter.iter/$get_name 1444.1.1 }
                 }
-                $set_idx = { /$parameter.workspace $add = { /$parameter.workspace/$get_idx 1 } }
-            }
+            } {
+            $set_name = { /$parameter.iter 1444.1.1 }
+        }
+        $else if { 
+                $AND_ALL = { 
+                    $is_quoted_str = { /$parameter.iter/$get_name }
+                    $COMP> = { $remove_quoted = { /$parameter.iter/$get_name } 1444.1.1 }
+                }
+            } {
+            $set_name = { /$parameter.iter "1444.1.1" }
         }
 
-        Event = {
-            id = test
-
-            $parameter = { iter }	
-
-            $if { 
-                    $AND_ALL = { 
-                        $NOT = { $is_quoted_str = { /$parameter.iter/$get_name } }			
-                        $COMP> = { /$parameter.iter/$get_name 1444.1.1 }
-                    }
-                } {
-                $set_name = { /$parameter.iter 1444.1.1 }
-            }
-            $else if { 
-                    $AND_ALL = { 
-                        $is_quoted_str = { /$parameter.iter/$get_name }
-                        $COMP> = { $remove_quoted = { /$parameter.iter/$get_name } 1444.1.1 }
-                    }
-                } {
-                $set_name = { /$parameter.iter "1444.1.1" }
-            }
-
-            $if { 
-                    $AND_ALL = {
-                        /$parameter.iter/$is_item
-                        $NOT = { $is_quoted_str = { /$parameter.iter/$get_value } }
-                        $COMP> = { $remove_quoted = { /$parameter.iter/$get_value } 1444.1.1 }
-                    }
-                } {
-                $set_value = { /$parameter.iter 1444.1.1 }
-            }
-            $else if { 
-                    $AND_ALL = { 
-                        /$parameter.iter/$is_item
-                        $is_quoted_str = { /$parameter.iter/$get_name }
-                        $COMP> = { $remove_quoted = { /$parameter.iter/$get_name } 1444.1.1 }
-                    }
-                } {
-                $set_value = { /$parameter.iter "1444.1.1" }
-            }
+        $if { 
+                $AND_ALL = {
+                    /$parameter.iter/$is_item
+                    $NOT = { $is_quoted_str = { /$parameter.iter/$get_value } }
+                    $COMP> = { $remove_quoted = { /$parameter.iter/$get_value } 1444.1.1 }
+                }
+            } {
+            $set_value = { /$parameter.iter 1444.1.1 }
         }
+        $else if { 
+                $AND_ALL = { 
+                    /$parameter.iter/$is_item
+                    $is_quoted_str = { /$parameter.iter/$get_name }
+                    $COMP> = { $remove_quoted = { /$parameter.iter/$get_name } 1444.1.1 }
+                }
+            } {
+            $set_value = { /$parameter.iter "1444.1.1" }
+        }
+    }
 
