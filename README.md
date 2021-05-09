@@ -26,6 +26,7 @@
               # id = while id = for id = call ... 
        # make_var_int, get_var_int, set_var_int <- var_id?
 
+
 # ClauScript++ Example...
 
     eu4 = {
@@ -37,12 +38,14 @@
     eu4 = ok 
 
     Event = {
-        id = main
+        id = main	# ClauScript Main - deleted..
 
         # load data from file.
         $find = { /./eu4/ }  # /dir/   /file
 
         $while { $not_empty = { /$return_value } } {
+            $load_data = { /$return_value "C:\Users\vztpv\Desktop\Clau\ClauParser\ClauParser\input.eu4" }
+
             $call = { id = iterate workspace = /$return_value/$enter event = test }
 
             $pop_front = { /$return_value } # /$return_value/$pop_front
@@ -107,4 +110,6 @@
             $set_value = { /$parameter.iter "1444.1.1" }
         }
     }
+
+
 
