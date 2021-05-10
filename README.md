@@ -99,7 +99,7 @@
                 $AND_ALL = {
                     /$parameter.iter/$is_item
                     $NOT = { $is_quoted_str = { /$parameter.iter/$get_value } }
-                    $COMP> = { $remove_quoted = { /$parameter.iter/$get_value } 1444.1.1 }
+                    $COMP> = { /$parameter.iter/$get_value 1444.1.1 }
                 }
             } {
             $set_value = { /$parameter.iter 1444.1.1 }
