@@ -67,7 +67,7 @@
             $call = { id = $parameter.event iter = /$parameter.workspace/$get_now } # $get_now = { } -> pair of UserType*, and long long
 
             $if { /$parameter.workspace/$is_group } {
-                $call = { id = iterate workspace = /$parameter.workspace/$enter } # $enter = { } -> pair of UserType*, and long long
+                $call = { id = iterate workspace = /$parameter.workspace/$clone/$enter } # $enter = { } -> pair of UserType*, and long long
             }
             $set_idx = { /$parameter.workspace $add = { /$parameter.workspace/$get_idx 1 } }
         }
