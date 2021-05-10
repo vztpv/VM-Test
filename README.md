@@ -3,7 +3,7 @@
 # ToDo (need....)
     1. Log Class (file or console output)(Error, General, Notice, Warnning)
     2. long long, long double, std::string_view, and struct Workspace { clau_parser::UserType* ut; long long idx; }
-    
+    3. ClauParser + line info + my own smart ptr?
 # ClauScript++ 구상
     $if, $else, # 조건문 
     $while, # 반복문
