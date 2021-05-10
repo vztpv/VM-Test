@@ -63,7 +63,7 @@
 
         # $ <- 데이터영역?에서 $로 시작하지않는다. - 조건?
 
-        $if { $COMP< = { /$parameter.workspace/$get_idx /$parameter.workspace/$get_size } } {
+        $while { $COMP< = { /$parameter.workspace/$get_idx /$parameter.workspace/$get_size } } {
             $call = { id = $parameter.event iter = /$parameter.workspace/$get_now } # $get_now = { } -> pair of UserType*, and long long
 
             $if { /$parameter.workspace/$is_group } {
