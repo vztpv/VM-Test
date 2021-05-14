@@ -48,7 +48,7 @@
         id = main	# ClauScript Main - deleted..
 
         # load data from file.
-        $find = { /eu4 }  # /./dir/   /./file
+        $find = { /eu4 }  # /./dir/   /./file  =>   /eu4/$find    /dir/x/$item   ??
 
         $while { $NOT = { $is_end = { } } } {
             $load_data = { $return_value = { } "C:\Users\vztpv\Desktop\Clau\ClauParser\ClauParser\input.eu4" }
