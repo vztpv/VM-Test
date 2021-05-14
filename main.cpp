@@ -60,7 +60,7 @@ struct Event {
 	long long now = 0;
 	std::vector<Token> return_value;
 	long long return_value_now;
-	std::vector<Token> input; // ?
+	wiz::SmartPtr<std::vector<Token>> input; // ?
 	std::unordered_map<std::string, Token> parameter;
 };
 
@@ -397,7 +397,7 @@ public:
 			case FUNC::FUNC_IS_QUOTED_STR:
 			{
 				auto str = token_stack.back().str_val;
-				bool chk = str.size() >= 2 && str[0] == str.back();
+				bool chk = str.size() >= 2 && str[0] == str.back() && str.back() == '\"';
 
 				token_stack.pop_back();
 
@@ -408,14 +408,15 @@ public:
 				break;
 			}
 			case FUNC::FUNC_RETURN:
-				//std::cout << "return .... \n";
+				//std::cout << "return .... \n";)
+
 				_stack.pop_back();
 				break;
 			case FUNC::CONSTANT:
 				x.now++;
 
 				{
-					auto value = x.input[x.event_data[x.now]];
+					auto value = (*x.input)[x.event_data[x.now]];
 
 					if (value.type == Token::Type::STRING) {
 						if (value.str_val._Starts_with("$parameter.")) {
@@ -487,11 +488,11 @@ public:
 							}
 						}
 
-						e.parameter[name.str_val] = value; // name.ToString()
+						e.parameter[name.str_val] = std::move(value); // name.ToString()
 					}
 
 					////std::cout << "call " << e.id << "\n";
-					_stack.push_back(e);
+					_stack.push_back(std::move(e));
 				}
 
 				continue;
@@ -811,9 +812,9 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 				token.type = Token::Type::STRING;
 				token.str_val = ut->GetItemList(it_count).GetName();
 
-				e->input.push_back(token);
+				e->input->push_back(token);
 				e->event_data.push_back(FUNC::CONSTANT);
-				e->event_data.push_back(e->input.size() - 1);
+				e->event_data.push_back(e->input->size() - 1);
 
 				len++;
 				len++;
@@ -841,9 +842,9 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 								token.type = Token::Type::STRING;
 								token.str_val = tokens[i];
 
-								e->input.push_back(token);
+								e->input->push_back(token);
 								e->event_data.push_back(FUNC::CONSTANT); len++;
-								e->event_data.push_back(e->input.size() - 1); len++;
+								e->event_data.push_back(e->input->size() - 1); len++;
 								e->event_data.push_back(FUNC::DIR); len++;
 							}
 						}
@@ -855,10 +856,10 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 						token.type = Token::Type::STRING;
 						token.str_val = ut->GetItemList(it_count).Get();
 
-						e->input.push_back(token);
+						e->input->push_back(token);
 
 						e->event_data.push_back(FUNC::CONSTANT); len++;
-						e->event_data.push_back(e->input.size() - 1); len++;
+						e->event_data.push_back(e->input->size() - 1); len++;
 					}
 				}
 			}
@@ -935,9 +936,9 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 								token.type = Token::Type::STRING;
 								token.str_val = tokens[i];
 
-								e->input.push_back(token);
+								e->input->push_back(token);
 								e->event_data.push_back(FUNC::CONSTANT); len++;
-								e->event_data.push_back(e->input.size() - 1); len++;
+								e->event_data.push_back(e->input->size() - 1); len++;
 								e->event_data.push_back(FUNC::DIR); len++;
 							}
 						}
@@ -949,10 +950,10 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 						token.type = Token::Type::STRING;
 						token.str_val = ut->GetItemList(it_count).Get();
 
-						e->input.push_back(token);
+						e->input->push_back(token);
 
 						e->event_data.push_back(FUNC::CONSTANT); len++;
-						e->event_data.push_back(e->input.size() - 1); len++;
+						e->event_data.push_back(e->input->size() - 1); len++;
 					}
 				}
 			}
@@ -1045,7 +1046,7 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 					else if (name == "$parameter"sv) {
 						for (int i = 0; i < count; i += 2) {
 							
-							auto name = e->input[e->event_data.back()].str_val;
+							auto name = (*e->input)[e->event_data.back()].str_val;
 							e->event_data.pop_back();
 							e->event_data.pop_back();
 
@@ -1119,7 +1120,7 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 
 						e->event_data.push_back(FUNC::FUNC_GET_NOW); len++;
 					}
-					e->input.push_back(token);
+					e->input->push_back(token);
 				}
 				else {
 					Token token(ut);
@@ -1127,9 +1128,9 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 					token.str_val = std::move(name);
 					token.type = Token::Type::STRING;
 
-					e->input.push_back(token);
+					e->input->push_back(token);
 					e->event_data.push_back(FUNC::CONSTANT); len++;
-					e->event_data.push_back(e->input.size() - 1); len++;
+					e->event_data.push_back(e->input->size() - 1); len++;
 				}
 			}
 
@@ -1152,10 +1153,11 @@ void Debug(const Event& e) {
 // need to exception processing.
 Event MakeByteCode(clau_parser::UserType* ut) {
 	Event e;
+	e.input = wiz::SmartPtr<std::vector<Token>>(new std::vector<Token>());
 
 	_MakeByteCode(ut, &e);
 
-
+	
 	e.event_data.push_back(FUNC::FUNC_RETURN);
 	e.id = ut->GetItem("id")[0].Get();
 
