@@ -4,7 +4,7 @@
     1. Log Class (file or console output)(Error, General, Notice, Warnning)
     2. long long, long double, std::string, bool, and struct Workspace { clau_parser::UserType* ut; long long idx; },
         and vector of ~~
-    4. ClauParser + line info + my own smart ptr?
+    4. ClauParser + line info + my own smart ptr? (shared, weak?)
 # ClauScript++ 구상
     $func = { a b c "d" } 
     /a@b@c@"d"/$func
