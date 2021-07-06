@@ -1507,6 +1507,7 @@ namespace clau_parser {
 			useSortedUserTypeList = false;
 		}
 	private:
+		bool changed = false;
 		UserType* parent = nullptr;
 		std::vector<int> ilist;
 		std::vector< ItemType<std::string> > itemList;
@@ -1708,21 +1709,50 @@ namespace clau_parser {
 			err = true;
 			return -1;
 		}
-		// test? - need more thinking!
-		size_t  _GetItemIndexFromIlistIndex(const std::vector<int>& ilist, const size_t  ilist_idx, bool& _err) {
+
+		size_t store = -1;
+		size_t store_ilist_idx = -1;
+
+		/// test? - need more thinking!
+		/// it was slow when iterate data. but now speed up!
+		size_t  _GetItemIndexFromIlistIndex(const std::vector<int>& ilist, const size_t ilist_idx, bool& _err) {
 			if (ilist.size() == ilist_idx) { return ilist.size(); }
-			
+
+			size_t item_idx = -1;
+			size_t start = 0;
+
+			bool chk = userTypeList.empty() ? true : useSortedUserTypeList;
+
+			if (!useSortedItemList) {
+				sortedItemList.clear();
+				for (size_t i = 0; i < itemList.size(); ++i) {
+					sortedItemList.push_back(WrapType<ItemType<std::string>*>((ItemType<std::string>*) & itemList[i], i));
+				}
+
+				std::sort(sortedItemList.begin(), sortedItemList.end(), ItemTypeStringPtrCompare());
+
+				useSortedItemList = true;
+			}
+
+			if (!chk) {
+				store_ilist_idx = -1;
+			}
+			else if (store_ilist_idx != -1) {
+				start = store_ilist_idx;
+				item_idx = store - 1;
+			}
+
 			bool err = false;
 			_err = false;
-			size_t idx = _GetIndex(ilist, 1, err, 0);
-			size_t item_idx = -1;
+
+			size_t idx = _GetIndex(ilist, 1, _err, start);
 
 			while (!err) {
 
 				item_idx++;
-				
-				if (ilist_idx == idx) { return item_idx; }
-				
+
+				if (ilist_idx == idx) { store_ilist_idx = ilist_idx; store = item_idx;  return item_idx; }
+
 				idx = _GetIndex(ilist, 1, err, idx + 1);
 			}
 			_err = true;

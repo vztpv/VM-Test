@@ -416,7 +416,7 @@ public:
 				x.now++;
 
 				{
-					auto value = (*x.input)[x.event_data[x.now]];
+					const auto& value = (*x.input)[x.event_data[x.now]];
 
 					if (value.type == Token::Type::STRING) {
 						if (value.str_val._Starts_with("$parameter.")) {
@@ -459,8 +459,7 @@ public:
 
 					Event e;
 
-					//std::cout << count << "\n";
-					for (auto i = 0; i < 10; ++i) { // chk count is not correct..
+					while (!(token_stack.back().type == Token::Type::FUNC && token_stack.back().func == FUNC::FUNC_CALL)) { 
 						auto value = token_stack.back();
 						token_stack.pop_back();
 						auto name = token_stack.back();
