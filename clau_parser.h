@@ -3464,7 +3464,7 @@ namespace clau_parser {
 			catch (const std::exception& e) { std::cout << e.what() << "\n"; fclose(inFile); return false; }
 			catch (...) { std::cout << "not expected error" << "\n"; fclose(inFile); return false; }
 
-
+			globalTemp.SetName(global.GetName());
 			global = std::move(globalTemp);
 
 			return true;

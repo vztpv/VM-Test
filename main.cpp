@@ -17,14 +17,14 @@ enum FUNC { FUNC_FIND, FUNC_WHILE, FUNC_RETURN_VALUE, FUNC_IS_END, FUNC_NOT,
 	FUNC_LOAD_DATA, FUNC_ENTER, FUNC_CALL, FUNC_NEXT, FUNC_RETURN, FUNC_COMP_RIGHT,
 	FUNC_ADD, FUNC_GET_IDX, FUNC_GET_SIZE, FUNC_GET_NOW, FUNC_CLONE, FUNC_QUIT, FUNC_IF, FUNC_IS_ITEM,
 	FUNC_IS_GROUP, FUNC_SET_IDX, FUNC_AND_ALL, FUNC_IS_QUOTED_STR, FUNC_COMP_LEFT, FUNC_SET_NAME, FUNC_GET_NAME, FUNC_GET_VALUE,
-		FUNC_SET_VALUE, FUNC_REMOVE_QUOTED, CONSTANT, THEN, WHILE_END, IF_END, START_DIR, DIR, END_DIR, NONE,
+		FUNC_SET_VALUE, FUNC_REMOVE_QUOTED, CONSTANT, THEN, WHILE_END, IF_END, START_DIR, DIR, END_DIR, FUNC_PRINT, NONE,
 	KEY, VALUE,  SIZE // chk?
   };
 const char* func_to_str[FUNC::SIZE] = {
 	"FIND", "WHILE", "RETURN_VALUE", "IS_END", "NOT", "LOAD_DATA", "ENTER", "CALL", "NEXT", "RETURN", "COMP_RIGHT",
 	"ADD", "GET_IDX", "GET_SIZE", "GET_NOW", "CLONE - remove?", "QUIT", "IF", "IS_ITEM",
 	"IS_GROUP", "SET_IDX", "AND_ALL", "IS_QUOTED_STR", "COMP_LEFT", "SET_NAME", "GET_NAME", "GET_VALUE",
-	"SET_VALUE", "REMOVE_QUOTED", "CONSTANT", "THEN", "WHILE_END", "IF_END", "START_DIR", "DIR", "END_DIR", "NONE", "KEY", "VALUE"
+	"SET_VALUE", "REMOVE_QUOTED", "CONSTANT", "THEN", "WHILE_END", "IF_END", "START_DIR", "DIR", "END_DIR", "PRINT", "NONE", "KEY", "VALUE"
 };
 
 class Workspace {
@@ -728,7 +728,7 @@ public:
 				auto a = token_stack.back();
 				token_stack.pop_back();
 
-				a.int_val = !a.int_val;
+				a.int_val = a.int_val? 0 : 1;
 				a.type = Token::Type::BOOL;
 				token_stack.push_back(a);
 			}
@@ -738,7 +738,7 @@ public:
 				Token token;
 				token.type = Token::Type::BOOL;
 
-				token.int_val = token_stack.back().workspace.reader->IsGroup();
+				token.int_val = token_stack.back().workspace.reader->IsGroup()? 1 : 0;
 				token_stack.pop_back();
 
 				token_stack.push_back(token);
@@ -776,6 +776,17 @@ public:
 				b.workspace.reader = wiz::SmartPtr<clau_parser::Reader>(new clau_parser::Reader(*a.reader));
 				token_stack.push_back(b);
 			}
+				break;
+
+			case FUNC::FUNC_PRINT:
+				if (token_stack.back().str_val == "\\n") {
+					std::cout << "\n";
+				}
+				else {
+					std::cout << token_stack.back().str_val;
+				}
+				
+				token_stack.pop_back();
 				break;
 			default:
 				//std::cout << "error \n";
@@ -1089,6 +1100,11 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 
 						e->event_data.push_back(FUNC::FUNC_SET_NAME); len++;
 					}
+					else if (name == "$get_value") {
+						token.func = FUNC::FUNC_GET_VALUE;
+
+						e->event_data.push_back(FUNC::FUNC_GET_VALUE); len++;
+					}
 					else if (name == "$set_value"sv) {
 						token.func = FUNC::FUNC_SET_VALUE;
 
@@ -1120,6 +1136,14 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 
 						e->event_data.push_back(FUNC::FUNC_GET_NOW); len++;
 					}
+					else if (name == "$print"sv) {	
+						token.func = FUNC::FUNC_PRINT;
+
+						e->event_data.push_back(FUNC::FUNC_PRINT); len++;
+					}
+
+					// todo - add processing. errors..
+
 					e->input->push_back(token);
 				}
 				else {
