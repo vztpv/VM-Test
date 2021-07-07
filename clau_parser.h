@@ -1722,17 +1722,8 @@ namespace clau_parser {
 			size_t start = 0;
 
 			bool chk = userTypeList.empty() ? true : useSortedUserTypeList;
-
-			if (!useSortedItemList) {
-				sortedItemList.clear();
-				for (size_t i = 0; i < itemList.size(); ++i) {
-					sortedItemList.push_back(WrapType<ItemType<std::string>*>((ItemType<std::string>*) & itemList[i], i));
-				}
-
-				std::sort(sortedItemList.begin(), sortedItemList.end(), ItemTypeStringPtrCompare());
-
-				useSortedItemList = true;
-			}
+			
+			// todo - changed....
 
 			if (!chk) {
 				store_ilist_idx = -1;
