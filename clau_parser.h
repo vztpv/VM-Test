@@ -1725,8 +1725,9 @@ namespace clau_parser {
 			size_t item_idx = -1;
 			size_t start = 0;
 
-			if (!changed) {
+			if (changed) {
 				store_ilist_idx = -1;
+				changed = false;
 			}
 			else if (store_ilist_idx != -1) {
 				start = store_ilist_idx;
