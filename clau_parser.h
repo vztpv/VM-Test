@@ -1505,9 +1505,10 @@ namespace clau_parser {
 			ut->parent = this;
 
 			useSortedUserTypeList = false;
+			changed = true;
 		}
 	private:
-		bool changed = false;
+		mutable bool changed = false;
 		UserType* parent = nullptr;
 		std::vector<int> ilist;
 		std::vector< ItemType<std::string> > itemList;
@@ -1618,6 +1619,7 @@ namespace clau_parser {
 						_stack.back()->itemList = _stack2.back().ut->itemList;
 						_stack.back()->useSortedItemList = false; // ut.useSortedItemList;
 						_stack.back()->useSortedUserTypeList = false; //ut.useSortedUserTypeList;
+						_stack.back()->changed = _stack2.back().ut->changed;
 					}
 
 					{
@@ -1655,6 +1657,7 @@ namespace clau_parser {
 
 			useSortedItemList = false; // ut.useSortedItemList;
 			useSortedUserTypeList = false; // ut.useSortedUserTypeList;
+			changed = ut.changed;
 
 			userTypeList.reserve(ut.userTypeList.size());
 
@@ -1684,6 +1687,7 @@ namespace clau_parser {
 
 			useSortedItemList = false;
 			useSortedUserTypeList = false;
+			changed = true;
 			RemoveUserTypeList();
 		}
 	public:
@@ -1721,17 +1725,13 @@ namespace clau_parser {
 			size_t item_idx = -1;
 			size_t start = 0;
 
-			bool chk = userTypeList.empty() ? true : useSortedUserTypeList;
-			
-			// todo - changed....
-  
-			//if (!chk) {
-			//	store_ilist_idx = -1;
-			//}
-			//else if (store_ilist_idx != -1) {
-			//	start = store_ilist_idx;
-			//	item_idx = store - 1;
-			//}
+			if (!changed) {
+				store_ilist_idx = -1;
+			}
+			else if (store_ilist_idx != -1) {
+				start = store_ilist_idx;
+				item_idx = store - 1;
+			}
 
 			bool err = false;
 			_err = false;
@@ -1806,6 +1806,7 @@ namespace clau_parser {
 			}
 
 			useSortedItemList = false;
+			changed = true;
 		}
 		void RemoveUserTypeList(const size_t idx, const bool chk = true)
 		{
@@ -1833,6 +1834,7 @@ namespace clau_parser {
 			}
 
 			useSortedUserTypeList = false;
+			changed = true;
 		}
 		void RemoveItemList(const std::string& varName)
 		{
@@ -1857,6 +1859,7 @@ namespace clau_parser {
 			itemList = std::move(tempDic);
 
 			useSortedItemList = false;
+			changed = true;
 		}
 		void RemoveItemList() /// ALL
 		{
@@ -1872,6 +1875,7 @@ namespace clau_parser {
 			ilist = move(temp);
 
 			useSortedItemList = false;
+			changed = true;
 		}
 		void RemoveEmptyItem()
 		{
@@ -1895,6 +1899,7 @@ namespace clau_parser {
 			itemList = move(tempDic);
 
 			useSortedItemList = false;
+			changed = true;
 		}
 		void Remove()
 		{
@@ -1908,6 +1913,7 @@ namespace clau_parser {
 
 			useSortedItemList = false;
 			useSortedUserTypeList = false;
+			changed = true;
 		}
 		void RemoveUserTypeList() {
 			for (size_t i = 0; i < userTypeList.size(); i++) {
@@ -1929,6 +1935,7 @@ namespace clau_parser {
 			ilist = move(temp);
 
 			useSortedUserTypeList = false;
+			changed = true;
 		}
 		void RemoveUserTypeList(const std::string& varName, const bool chk = true)
 		{
@@ -1955,6 +1962,7 @@ namespace clau_parser {
 			userTypeList = move(tempDic);
 
 			useSortedUserTypeList = false;
+			changed = true;
 		}
 		//			
 		void RemoveList(const size_t idx, bool remove_ut = true) // ilist_idx!
@@ -2007,6 +2015,7 @@ namespace clau_parser {
 			}
 
 			useSortedItemList = false;
+			changed = true;
 		}
 		void InsertItemByIlist(const size_t  ilist_idx, std::string&& name, std::string&& item) {
 			ilist.push_back(1);
@@ -2033,6 +2042,7 @@ namespace clau_parser {
 
 
 			useSortedItemList = false;
+			changed = true;
 		}
 
 		void InsertUserTypeByIlist(const size_t ilist_idx, UserType&& item) {
@@ -2061,6 +2071,7 @@ namespace clau_parser {
 
 
 			useSortedUserTypeList = false;
+			changed = true;
 		}
 		void InsertUserTypeByIlist(const size_t ilist_idx, const UserType& item) {
 			ilist.push_back(2);
@@ -2088,6 +2099,7 @@ namespace clau_parser {
 			}
 
 			useSortedUserTypeList = false;
+			changed = true;
 		}
 
 		void ReserveIList(size_t offset)
@@ -2113,6 +2125,7 @@ namespace clau_parser {
 			ilist.push_back(1);
 
 			useSortedItemList = false;
+			changed = true;
 		}
 
 		void AddItem(std::string&& name, std::string&& item) {
@@ -2120,18 +2133,21 @@ namespace clau_parser {
 			ilist.push_back(1);
 
 			useSortedItemList = false;
+			changed = true;
 		}
 		void AddItem(const std::string& name, const std::string& item) {
 			itemList.emplace_back(name, item);
 			ilist.push_back(1);
 
 			useSortedItemList = false;
+			changed = true;
 		}
 		void AddItemType(clau_parser::ItemType<std::string>&& item) {
 			itemList.push_back(std::move(item));
 			ilist.push_back(1);
 
 			useSortedItemList = false;
+			changed = true;
 		}
 
 		void AddItemType(const clau_parser::ItemType<std::string>& item) {
@@ -2139,6 +2155,7 @@ namespace clau_parser {
 			ilist.push_back(1);
 
 			useSortedItemList = false;
+			changed = true;
 		}
 		void AddUserTypeItem(UserType&& item) {
 			UserType* temp = new UserType(std::move(item.GetName()));
@@ -2152,6 +2169,7 @@ namespace clau_parser {
 			useSortedUserTypeList = false;
 			useSortedItemList = false;
 
+			changed = true;
 
 			{
 				temp->itemList = std::move(item.itemList);
@@ -2175,6 +2193,7 @@ namespace clau_parser {
 			userTypeList.push_back(temp);
 
 			useSortedUserTypeList = false;
+			changed = true;
 		}
 		void AddItemAtFront(std::string&& name, std::string&& item) {
 			itemList.emplace(itemList.begin(), name, item);
@@ -2182,6 +2201,7 @@ namespace clau_parser {
 			ilist.insert(ilist.begin(), 1);
 
 			useSortedItemList = false;
+			changed = true;
 		}
 		void AddItemAtFront(const std::string& name, const std::string& item) {
 			itemList.emplace(itemList.begin(), name, item);
@@ -2189,6 +2209,7 @@ namespace clau_parser {
 			ilist.insert(ilist.begin(), 1);
 
 			useSortedItemList = false;
+			changed = true;
 		}
 		void AddUserTypeItemAtFront(const UserType& item) {
 			UserType* temp = new UserType(item);
@@ -2199,6 +2220,7 @@ namespace clau_parser {
 			userTypeList.insert(userTypeList.begin(), temp);
 
 			useSortedUserTypeList = false;
+			changed = true;
 		}
 		void AddUserTypeItemAtFront(UserType&& item) {
 			UserType* temp = new UserType(item);
@@ -2209,6 +2231,7 @@ namespace clau_parser {
 			userTypeList.insert(userTypeList.begin(), temp);
 
 			useSortedUserTypeList = false;
+			changed = true;
 		}
 
 
@@ -2222,6 +2245,9 @@ namespace clau_parser {
 				}
 				return temp;
 			}
+			
+
+			changed = false;
 
 			if (false == useSortedUserTypeList) {
 				// make sortedUserTypeList.
@@ -2288,6 +2314,9 @@ namespace clau_parser {
 			}
 			else*/
 			{
+
+				changed = false;
+
 				if (false == useSortedItemList) {
 					sortedItemList.clear();
 					for (size_t i = 0; i < itemList.size(); ++i) {
@@ -2373,6 +2402,9 @@ namespace clau_parser {
 
 				useSortedUserTypeList = true;
 			}
+
+
+			changed = false;
 			// binary search
 			{
 				UserType x = UserType(name);
@@ -2426,6 +2458,9 @@ namespace clau_parser {
 
 				useSortedUserTypeList = true;
 			}
+
+			changed = false;
+
 			// binary search
 			{
 				UserType x = UserType(name);
@@ -2488,6 +2523,9 @@ namespace clau_parser {
 
 					useSortedItemList = true;
 				}
+
+
+				changed = false;
 				// binary search
 				{
 					bool err = false;
