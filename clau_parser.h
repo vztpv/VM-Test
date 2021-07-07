@@ -1724,14 +1724,14 @@ namespace clau_parser {
 			bool chk = userTypeList.empty() ? true : useSortedUserTypeList;
 			
 			// todo - changed....
-
-			if (!chk) {
-				store_ilist_idx = -1;
-			}
-			else if (store_ilist_idx != -1) {
-				start = store_ilist_idx;
-				item_idx = store - 1;
-			}
+  
+			//if (!chk) {
+			//	store_ilist_idx = -1;
+			//}
+			//else if (store_ilist_idx != -1) {
+			//	start = store_ilist_idx;
+			//	item_idx = store - 1;
+			//}
 
 			bool err = false;
 			_err = false;
