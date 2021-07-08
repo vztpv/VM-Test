@@ -52,6 +52,8 @@ public:
 	Token(clau_parser::UserType* ut = nullptr) : workspace(ut) {
 		//
 	}
+
+	// ToString();
 };
 struct Event {
 	Workspace workspace;
@@ -350,33 +352,20 @@ public:
 					token_stack.push_back(token);
 				}
 				else {
-
 					dir += token_stack.back().str_val; // ToString
-
-					////std::cout << "str_val " << token_stack.back().str_val << "\n";
-					
-					if (token_stack.back().str_val.empty() == false) {
-						dir += "/";
-						token_stack.pop_back();
-					}
 				}
 			}
 
 			break;
 			case FUNC::END_DIR:
 			{
-				if (!dir.empty()) {
+				Token token;
+				token.type = Token::STRING;
+				token.str_val = dir;
+				token_stack.push_back(token);
 
-					Token token;
-					token.type = Token::STRING;
-					token.str_val = dir;
-					token_stack.push_back(token);
-
-					dir = "";
-				}
-
+				dir = "";
 				count = 0;
-
 			}
 			break;
 			case FUNC::FUNC_REMOVE_QUOTED:
@@ -861,6 +850,29 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 
 						e->event_data.push_back(FUNC::END_DIR); len++;
 					}
+					else if (a._Starts_with("@")) {
+						auto tokens = tokenize(a, '@');
+
+						for (int i = 0; i < tokens.size(); ++i) {
+							if (tokens[i]._Starts_with("$"sv) && !tokens[i]._Starts_with("$parameter."sv)) {
+								clau_parser::UserType new_ut;
+
+								new_ut.AddUserTypeItem(clau_parser::UserType(tokens[i]));
+
+								len += _MakeByteCode(&new_ut, e);
+								break;
+							}
+							else {
+								Token token(ut);
+								token.type = Token::Type::STRING;
+								token.str_val = tokens[i];
+
+								e->input->push_back(token);
+								e->event_data.push_back(FUNC::CONSTANT); len++;
+								e->event_data.push_back(e->input->size() - 1); len++;
+							}
+						}
+					}
 					else {
 						Token token;
 						token.type = Token::Type::STRING;
@@ -954,6 +966,29 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 						}
 
 						e->event_data.push_back(FUNC::END_DIR); len++;
+					}
+					else if (a._Starts_with("@")) {
+						auto tokens = tokenize(a, '@');
+
+						for (int i = 0; i < tokens.size(); ++i) {
+							if (tokens[i]._Starts_with("$"sv) && !tokens[i]._Starts_with("$parameter."sv)) {
+								clau_parser::UserType new_ut;
+
+								new_ut.AddUserTypeItem(clau_parser::UserType(tokens[i]));
+
+								len += _MakeByteCode(&new_ut, e);
+								break;
+							}
+							else {
+								Token token(ut);
+								token.type = Token::Type::STRING;
+								token.str_val = tokens[i];
+
+								e->input->push_back(token);
+								e->event_data.push_back(FUNC::CONSTANT); len++;
+								e->event_data.push_back(e->input->size() - 1); len++;
+							}
+						}
 					}
 					else {
 						Token token;
