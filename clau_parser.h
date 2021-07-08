@@ -31,7 +31,41 @@ namespace clau_parser {
 		constexpr char Assignment = '=';	// = :
 	}
 
+	inline std::vector<std::string> tokenize(std::string sv, char ch) {
+		std::vector<std::string> result;
+		size_t x;
+		if ((x = sv.find(ch)) == std::string::npos) {
+			if (!sv.empty()) {
+				result.push_back(sv);
+			}
+			return result;
+		}
 
+		if (x > 0) {
+			result.push_back(sv.substr(0, x));
+		}
+
+		size_t y;
+		while (x != std::string::npos) {
+			y = sv.find(ch, x + 1);
+
+			if (y == std::string::npos) {
+				if (x + 1 < sv.size()) {
+					result.push_back(sv.substr(x + 1));
+				}
+				break;
+			}
+			else {
+				if (y - 1 - x + 1 > 0) {
+					result.push_back(sv.substr(x + 1, y - 1 - (x + 1) + 1));
+				}
+			}
+
+			x = y;
+		}
+
+		return result;
+	}
 	class Utility {
 	private:
 		class BomInfo
@@ -2832,6 +2866,163 @@ namespace clau_parser {
 			}
 			return temp;
 		}
+
+
+		static std::pair<bool, std::vector< UserType*> > Find(UserType* global, const std::string& _position) /// option, option_offset
+		{
+			std::string position = _position;
+
+			if (!position.empty() && position[0] == '@') { position.erase(position.begin()); }
+
+			std::vector<std::string> x;
+
+
+			//wiz::Out << "string view is " << pos_sv << " ";
+			std::vector<std::string> tokens = tokenize(position, '/');
+
+			for (size_t i = 0; i < tokens.size(); ++i) {
+				std::string temp = tokens[i];
+
+				//wiz::Out << tokens[i] << " ";
+
+				if (temp == ".") {
+					continue;
+				}
+
+				if (x.empty()) {
+					x.push_back(temp);
+				}
+				else if (x.back() != ".." && temp == "..") {
+					x.pop_back();
+				}
+				else {
+					x.push_back(temp);
+				}
+			}
+
+			return _Find(std::move(x), global);
+		}
+		private:
+			// find userType! not itemList!,
+			// this has bug
+			/// /../x ok   ( /../../y ok)
+			/// /x/../x/../x no
+			static std::pair<bool, std::vector< UserType*> > _Find(std::vector<std::string>&& tokens, UserType* global) /// option, option_offset
+			{
+				std::vector< UserType* > temp;
+				int start = 0;
+
+				if (tokens.empty()) { temp.push_back(global); return{ true, temp }; }
+				if (tokens.size() == 1 && tokens[0] == ".") { temp.push_back(global); return{ true, temp }; }
+				//if (position.size() == 1 && position[0] == "/./") { temp.push_back(global); return{ true, temp }; } // chk..
+				//if (position.size() == 1 && position[0] == "/.") { temp.push_back(global); return{ true, temp }; }
+				//if (position.size() == 1 && position[0] == "/") { temp.push_back(global); return{ true, temp }; }
+
+				if (tokens.size() > 1 && tokens[0] == ".")
+				{
+					start = 1;
+					//position = String::substring(position, 3);
+				}
+
+				std::list<std::pair< UserType*, int >> utDeck;
+				std::pair<UserType*, int> utTemp;
+				utTemp.first = global;
+				utTemp.second = 0;
+				std::vector<std::string> strVec;
+
+				//wiz::Out << "position is " << position << "\t";
+				for (int i = start; i < tokens.size(); ++i) {
+					std::string strTemp = tokens[i];
+
+					//wiz::Out << strTemp << " ";
+
+					if (strTemp == "root" && i == 0) {
+					}
+					else {
+						strVec.push_back(strTemp);
+					}
+
+					if ((strVec.size() >= 1) && (" " == strVec[strVec.size() - 1])) /// chk!!
+					{
+						strVec[strVec.size() - 1] = "";
+					}
+					else if ((strVec.size() >= 1) && ("_" == strVec[strVec.size() - 1]))
+					{
+						strVec[strVec.size() - 1] = "";
+					}
+				}
+
+				// it has bug!
+				{
+					int count = 0;
+
+					for (int i = 0; i < strVec.size(); ++i) {
+						if (strVec[i] == "..") {
+							count++;
+						}
+						else {
+							break;
+						}
+					}
+
+					std::reverse(strVec.begin(), strVec.end());
+
+					for (int i = 0; i < count; ++i) {
+						if (utTemp.first == nullptr) {
+							return{ false, std::vector< UserType* >() };
+						}
+						utTemp.first = utTemp.first->GetParent();
+						strVec.pop_back();
+					}
+					std::reverse(strVec.begin(), strVec.end());
+				}
+				//wiz::Out << "\n";
+
+				utDeck.push_front(utTemp);
+
+				bool exist = false;
+				while (false == utDeck.empty()) {
+					utTemp = utDeck.front();
+					utDeck.pop_front();
+
+					if (utTemp.second < strVec.size() && strVec[utTemp.second] == "$")
+					{
+						for (int j = utTemp.first->GetUserTypeListSize() - 1; j >= 0; --j) {
+							UserType* x = utTemp.first->GetUserTypeList(j);
+							utDeck.push_front(std::make_pair(x, utTemp.second + 1));
+						}
+					}
+					else if (utTemp.second < strVec.size() && strVec[utTemp.second]._Starts_with("$.")) /// $."abc"
+					{
+						std::string rex_str = strVec[utTemp.second].substr(3, strVec[utTemp.second].size() - 4);
+						std::regex rgx(rex_str.data());
+
+						for (int j = utTemp.first->GetUserTypeListSize() - 1; j >= 0; --j) {
+							if (std::regex_match(utTemp.first->GetUserTypeList(j)->GetName(), rgx)) {
+								UserType* x = utTemp.first->GetUserTypeList(j);
+								utDeck.push_front(std::make_pair(x, utTemp.second + 1));
+							}
+						}
+					}
+					else if (utTemp.second < strVec.size() &&
+						(utTemp.first->GetUserTypeItem(strVec[utTemp.second]).empty() == false))
+					{
+						auto  x = utTemp.first->GetUserTypeItem(strVec[utTemp.second]);
+						for (int j = x.size() - 1; j >= 0; --j) {
+							utDeck.push_front(std::make_pair(x[j], utTemp.second + 1));
+						}
+					}
+
+					if (utTemp.second == strVec.size()) {
+						exist = true;
+						temp.push_back(utTemp.first);
+					}
+				}
+				if (false == exist) {
+					return{ false, std::vector<UserType*>() };
+				}
+				return{ true, temp };
+			}
 	public:
 	};
 

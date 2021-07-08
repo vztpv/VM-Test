@@ -12,18 +12,18 @@ using namespace std::literals;
 
 
 
-
-enum FUNC { FUNC_FIND, FUNC_WHILE, FUNC_RETURN_VALUE, FUNC_IS_END, FUNC_NOT,
+enum FUNC { FUNC_GET, FUNC_FIND, FUNC_WHILE, FUNC_RETURN_VALUE, FUNC_IS_END, FUNC_NOT,
 	FUNC_LOAD_DATA, FUNC_ENTER, FUNC_CALL, FUNC_NEXT, FUNC_RETURN, FUNC_COMP_RIGHT,
 	FUNC_ADD, FUNC_GET_IDX, FUNC_GET_SIZE, FUNC_GET_NOW, FUNC_CLONE, FUNC_QUIT, FUNC_IF, FUNC_IS_ITEM,
-	FUNC_IS_GROUP, FUNC_SET_IDX, FUNC_AND_ALL, FUNC_IS_QUOTED_STR, FUNC_COMP_LEFT, FUNC_SET_NAME, FUNC_GET_NAME, FUNC_GET_VALUE,
+	FUNC_IS_GROUP, FUNC_SET_IDX, FUNC_AND, FUNC_IS_QUOTED_STR, FUNC_COMP_LEFT, FUNC_SET_NAME, FUNC_GET_NAME, FUNC_GET_VALUE,
 		FUNC_SET_VALUE, FUNC_REMOVE_QUOTED, CONSTANT, THEN, WHILE_END, IF_END, START_DIR, DIR, END_DIR, FUNC_PRINT, NONE,
 	KEY, VALUE,  SIZE // chk?
   };
 const char* func_to_str[FUNC::SIZE] = {
+	"GET",
 	"FIND", "WHILE", "RETURN_VALUE", "IS_END", "NOT", "LOAD_DATA", "ENTER", "CALL", "NEXT", "RETURN", "COMP_RIGHT",
-	"ADD", "GET_IDX", "GET_SIZE", "GET_NOW", "CLONE - remove?", "QUIT", "IF", "IS_ITEM",
-	"IS_GROUP", "SET_IDX", "AND_ALL", "IS_QUOTED_STR", "COMP_LEFT", "SET_NAME", "GET_NAME", "GET_VALUE",
+	"ADD", "GET_IDX", "GET_SIZE", "GET_NOW", "CLONE", "QUIT", "IF", "IS_ITEM",
+	"IS_GROUP", "SET_IDX", "AND", "IS_QUOTED_STR", "COMP_LEFT", "SET_NAME", "GET_NAME", "GET_VALUE",
 	"SET_VALUE", "REMOVE_QUOTED", "CONSTANT", "THEN", "WHILE_END", "IF_END", "START_DIR", "DIR", "END_DIR", "PRINT", "NONE", "KEY", "VALUE"
 };
 
@@ -55,6 +55,66 @@ public:
 
 	// ToString();
 };
+
+
+static std::vector<Token> FindValue(clau_parser::UserType* ut, const std::string& str)
+{ // std::string ´ë½Å vector<std::string> ??
+	int count = 0;
+	int idx = -1;
+	for (int i = str.size() - 1; i >= 0; --i) {
+		if ('/' == str[i]) {
+			if (count == 0) {
+				idx = i;
+			}
+			count++;
+		}
+	}
+
+	std::vector<Token> result;
+
+	if (count == 1)
+	{ 
+		Token token;
+		token.type = Token::Type::STRING;
+		return { token };
+	}
+	else {
+		auto x = clau_parser::UserType::Find(ut, str.substr(0, idx + 1));
+
+		if (x.first == false) { return result; }
+
+		for (int i = 0; i < x.second.size(); ++i) {
+			std::string itemName = str.substr(idx + 1);
+
+			if (itemName._Starts_with("$it") && itemName.size() >= 4) {
+				int itemIdx = std::stoi(itemName.substr(3));
+
+				Token temp;
+				temp.type = Token::Type::STRING;
+				temp.str_val = (x.second[i]->GetItemList(itemIdx).Get(0));
+				result.push_back(temp);
+			}
+			else {
+				if (itemName == "_") {
+					itemName = "";
+				}
+				auto temp = x.second[i]->GetItem(itemName);
+				if (!temp.empty()) {
+					for (int j = 0; j < temp.size(); ++j) {
+						Token tkn;
+						tkn.type = Token::Type::STRING;
+						tkn.str_val = temp[j].Get(0);
+
+						result.push_back(tkn);
+					}
+				}
+			}
+		}
+	}
+	return result;
+}
+
+
 struct Event {
 	Workspace workspace;
 	std::string id;
@@ -103,41 +163,6 @@ struct Event {
 		return count;
 	}
 
-	std::vector<std::string> tokenize(std::string sv, char ch) {
-		std::vector<std::string> result;
-		size_t x;
-		if ((x = sv.find(ch)) == std::string::npos) {
-			if (!sv.empty()) {
-				result.push_back(sv);
-			}
-			return result;
-		}
-
-		if (x > 0) {
-			result.push_back(sv.substr(0, x));
-		}
-
-		size_t y;
-		while (x != std::string::npos) {
-			y = sv.find(ch, x + 1);
-
-			if (y == std::string::npos) {
-				if (x + 1 < sv.size()) {
-					result.push_back(sv.substr(x + 1));
-				}
-				break;
-			}
-			else {
-				if (y - 1 - x + 1 > 0) {
-					result.push_back(sv.substr(x + 1, y - 1 - (x + 1) + 1));
-				}
-			}
-
-			x = y;
-		}
-
-		return result;
-	}
 
 class VM {
 private:
@@ -152,7 +177,7 @@ private:
 
 
 		//wiz::Out << "string view is " << pos_sv << " ";
-		std::vector<std::string> tokens = tokenize(position, '/');
+		std::vector<std::string> tokens = clau_parser::tokenize(position, '/');
 
 		for (size_t i = 0; i < tokens.size(); ++i) {
 			std::string temp = tokens[i];
@@ -334,6 +359,21 @@ public:
 	//std::cout << func_to_str[x.event_data[x.now]] << "\n";
 
 			switch (x.event_data[x.now]) {
+			case FUNC::FUNC_GET:
+			{
+				auto token = token_stack.back();
+				token_stack.pop_back();
+
+				/// <summary>
+				/// Todo - from clauscript 
+				/// </summary>
+				/// <param name="id"></param>
+				/// <param name="global"></param>
+				auto value = FindValue(global, token.str_val); // ToString?
+
+				token_stack.push_back(value[0]);
+			}
+			break;
 			case FUNC::START_DIR:
 				count = 0;
 				dir = "/";
@@ -630,7 +670,7 @@ public:
 			}
 			break;
 
-			case FUNC::FUNC_AND_ALL:
+			case FUNC::FUNC_AND: // todo 
 			{
 				x.now++;
 
@@ -825,7 +865,7 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 
 						e->event_data.push_back(FUNC::START_DIR);
 						len++;
-						auto tokens = tokenize(a, '/');
+						auto tokens = clau_parser::tokenize(a, '/');
 
 						for (int i = 0; i < tokens.size(); ++i) {
 							if (tokens[i]._Starts_with("$"sv) && !tokens[i]._Starts_with("$parameter."sv)) {
@@ -850,7 +890,7 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 						e->event_data.push_back(FUNC::END_DIR); len++;
 					}
 					else if (a._Starts_with("@")) {
-						auto tokens = tokenize(a, '@');
+						auto tokens = clau_parser::tokenize(a, '@');
 
 						for (int i = 0; i < tokens.size(); ++i) {
 							if (tokens[i]._Starts_with("$"sv) && !tokens[i]._Starts_with("$parameter."sv)) {
@@ -941,7 +981,7 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 
 						e->event_data.push_back(FUNC::START_DIR);
 						len++;
-						auto tokens = tokenize(a, '/');
+						auto tokens = clau_parser::tokenize(a, '/');
 
 						for (int i = 0; i < tokens.size(); ++i) {
 							if (tokens[i]._Starts_with("$"sv) && !tokens[i]._Starts_with("$parameter."sv)) {
@@ -967,7 +1007,7 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 						e->event_data.push_back(FUNC::END_DIR); len++;
 					}
 					else if (a._Starts_with("@")) {
-						auto tokens = tokenize(a, '@');
+						auto tokens = clau_parser::tokenize(a, '@');
 
 						for (int i = 0; i < tokens.size(); ++i) {
 							if (tokens[i]._Starts_with("$"sv) && !tokens[i]._Starts_with("$parameter."sv)) {
@@ -1041,6 +1081,11 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 
 						e->event_data.push_back(FUNC::FUNC_ADD); len++;
 					}
+					else if (name == "$get"sv) {
+						token.func = FUNC::FUNC_GET;
+						
+						e->event_data.push_back(FUNC::FUNC_GET); len++;
+					}
 					else if (name == "$get_name"sv) {
 						token.func = FUNC::FUNC_GET_NAME;
 
@@ -1106,10 +1151,10 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 
 						e->event_data.push_back(FUNC::FUNC_COMP_LEFT); len++;
 					}
-					else if (name == "$AND_ALL") {
-						token.func = FUNC::FUNC_AND_ALL;
+					else if (name == "$AND") {
+						token.func = FUNC::FUNC_AND;
 
-						e->event_data.push_back(FUNC::FUNC_AND_ALL); len++;
+						e->event_data.push_back(FUNC::FUNC_AND); len++;
 						e->event_data.push_back(count); len++;
 					}
 					else if (name == "$get_size"sv) {
