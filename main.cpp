@@ -336,7 +336,7 @@ public:
 			switch (x.event_data[x.now]) {
 			case FUNC::START_DIR:
 				count = 0;
-				dir = "";
+				dir = "/";
 				break;
 			case FUNC::DIR:
 				////std::cout << "DIR chk" << token_stack.back().str_val << "\n";
