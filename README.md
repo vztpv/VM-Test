@@ -34,9 +34,6 @@
               # id = while id = for id = call ... 
        # make_var_int, get_var_int, set_var_int <- var_id?
 
-
-# ClauScript++ Example...
-
 # ClauScript++ Example...
 
     eu4 = {
