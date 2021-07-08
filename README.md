@@ -35,12 +35,15 @@
        # make_var_int, get_var_int, set_var_int <- var_id?
 
 # ClauScript++ Example...
+    # ToDo - end of function.?  $find = { @eu4 } FUNC_FIND DIR_START DIR END_DIR (END_FUNC?)
+    # ToDo - @eu4@$find  # <- now no ok.
+
+    test = "eu4"
 
     eu4 = {
 
     }
 
-    test = "eu4"
 
     Event = {
         id = main
@@ -50,7 +53,11 @@
 
         $load_data = { $return_value = { } "C:\Users\vztpv\Desktop\Clau\ClauParser\ClauParser\input.eu4" }
 
-        $call = { id = iterate workspace = /$return_value  event = test }
+        $call = { id = iterate workspace = @$return_value  event = test } # @$return_value ??
+
+        # @a@$func <- no ok.
+        # $func2 = { @a@$func } # <- ok.
+
     }
 
     Event = {
@@ -60,23 +67,23 @@
 
         # $ <- 데이터영역?에서 $로 시작하지않는다. - 조건?
 
-        $set_idx = { /$parameter.workspace 0 }
+        $set_idx = { @$parameter.workspace 0 }
 
-        $while { $COMP< = { $get_idx = { /$parameter.workspace } $get_size = { /$parameter.workspace } } } 
+        $while { $COMP< = { $get_idx = { @$parameter.workspace } $get_size = { @$parameter.workspace } } } 
         {	
             $call = { id = $parameter.event 
-                iter = /$parameter.workspace
-                name = /$parameter.workspace/$get_name 
-                value = /$parameter.workspace/$get_value
-                is_user_type = /$parameter.workspace/$is_group
+                iter = @$parameter.workspace
+                name = @$parameter.workspace@$get_name 
+                value = @$parameter.workspace@$get_value
+                is_user_type = @$parameter.workspace@$is_group
             } 
 
-            $if { /$parameter.workspace/$is_group } {
-                /$parameter.workspace/$enter
-                $call = { id = iterate workspace = /$parameter.workspace/$clone event = $parameter.event } # $enter = { } -> pair of UserType*, and long long
-                /$parameter.workspace/$quit
+            $if { @$parameter.workspace@$is_group } {
+                @$parameter.workspace@$enter
+                $call = { id = iterate workspace = @$parameter.workspace@$clone event = $parameter.event } # $enter = { } -> pair of UserType*, and long long
+                @$parameter.workspace@$quit
             }
-            $set_idx = { /$parameter.workspace $add = { /$parameter.workspace/$get_idx 1 } }
+            $set_idx = { @$parameter.workspace $add = { @$parameter.workspace@$get_idx 1 } }
         }
     }
 
@@ -95,7 +102,7 @@
 
             #$print = { $parameter.name } 
 
-            $set_name = { /$parameter.iter $parameter.name }
+            $set_name = { @$parameter.iter $parameter.name }
         }
         $if { 
                 $AND_ALL = { 
@@ -108,7 +115,7 @@
 
             #$print = { $parameter.name } 
 
-            $set_name = { /$parameter.iter $remove_quoted = { $parameter.name} }
+            $set_name = { @$parameter.iter $remove_quoted = { $parameter.name} }
         }
 
         $if { 
@@ -125,7 +132,7 @@
             #$print = { $parameter.value } 
             #$print = { \n }
 
-            $set_value = { /$parameter.iter $parameter.value }
+            $set_value = { @$parameter.iter $parameter.value }
         }
         $if { 
                 $AND_ALL = { 
@@ -140,10 +147,9 @@
             #$print = { $parameter.value } 
             #$print = { \n }
 
-            $set_value = { /$parameter.iter $remove_quoted = { $parameter.value } }
+            $set_value = { @$parameter.iter $remove_quoted = { $parameter.value } }
         }
     }
-
 
 
 
