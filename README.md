@@ -34,6 +34,7 @@
               # id = while id = for id = call ... 
        # make_var_int, get_var_int, set_var_int <- var_id?
 
+
 # ClauScript++ Example...
 
     # ToDo - end of function.?  $find = { @eu4 } FUNC_FIND DIR_START DIR END_DIR (END_FUNC?)
@@ -41,16 +42,22 @@
 
     test = "eu4"
 
-    eu4 = {
+    Test = {
+        eu4 = {
 
+        }
     }
-
 
     Event = {
         id = main
 
+        $print = { @1@2@$add@4@$add }
+        $print = { \n } 
+
         # load data from file.
-        $find = { /eu4 }  
+        #$find = { /Test/eu4 }  
+
+        @/Test/eu4@$find 
 
         $load_data = { $return_value = { } "C:\Users\vztpv\Desktop\Clau\ClauParser\ClauParser\input.eu4" }
 
@@ -164,5 +171,6 @@
             $set_value = { @$parameter.iter $remove_quoted = { $parameter.value } }
         }
     }
+
 
 
