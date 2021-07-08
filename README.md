@@ -37,29 +37,23 @@
 
 # ClauScript++ Example...
 
+# ClauScript++ Example...
+
     eu4 = {
 
     }
-    #eu4 = {
-    #	
-    #}
-    eu4 = ok 
+
+    test = "eu4"
 
     Event = {
-        id = main	# ClauScript Main - deleted..
+        id = main
 
         # load data from file.
-        $find = { /eu4 }  # /./dir/   /./file  =>   /eu4/$find    /dir/x/$item   ??
+        $find = { /eu4 }  
 
-        $while { $NOT = { $is_end = { } } } {
-            $load_data = { $return_value = { } "C:\Users\vztpv\Desktop\Clau\ClauParser\ClauParser\input.eu4" }
+        $load_data = { $return_value = { } "C:\Users\vztpv\Desktop\Clau\ClauParser\ClauParser\input.eu4" }
 
-            $enter = { $return_value = { } }
-            $call = { id = iterate workspace = /$return_value  event = test }
-            $quit = { $return_value = { } }
-
-            $next = { } # /$return_value/$pop_front
-        }
+        $call = { id = iterate workspace = /$return_value  event = test }
     }
 
     Event = {
@@ -98,10 +92,13 @@
                 $AND_ALL = { 
                     $NOT = { $is_quoted_str = { $parameter.name } }			
                     $NOT = { $is_quoted_str = { $parameter.name } }			
-                    #TRUE $COMP> = { $parameter.name 1444 }
+                    # $COMP> = { $parameter.name 1444 }
                 }
             } {
-            $set_name = { /$parameter.iter wwwwww }
+
+            #$print = { $parameter.name } 
+
+            $set_name = { /$parameter.iter $parameter.name }
         }
         $if { 
                 $AND_ALL = { 
@@ -111,7 +108,10 @@
                     #$COMP> = { $remove_quoted = { $parameter.name } 1444 }
                 }
             } {
-            $set_name = { /$parameter.iter "wwwwww" }
+
+            #$print = { $parameter.name } 
+
+            $set_name = { /$parameter.iter $remove_quoted = { $parameter.name} }
         }
 
         $if { 
@@ -123,7 +123,12 @@
                     #}
                 }
             } {
-            $set_value = { /$parameter.iter wwwwww }
+
+            #$print = { : }
+            #$print = { $parameter.value } 
+            #$print = { \n }
+
+            $set_value = { /$parameter.iter $parameter.value }
         }
         $if { 
                 $AND_ALL = { 
@@ -134,9 +139,14 @@
                     #}
                 }
             } {
-            $set_value = { /$parameter.iter "wwwwww" }
+            #$print = { : }
+            #$print = { $parameter.value } 
+            #$print = { \n }
+
+            $set_value = { /$parameter.iter $remove_quoted = { $parameter.value } }
         }
     }
+
 
 
 
