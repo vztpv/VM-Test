@@ -64,7 +64,7 @@
 
         $load_data = { $return_value = { } "C:\Users\vztpv\Desktop\Clau\ClauParser\ClauParser\input.eu4" }
 
-        $call = { id = iterate workspace = @$return_value  event = test } # @$return_value ??
+        $call = { id = iterate workspace = @$return_value@$clone  event = test } # @$return_value ??
 
         # @a@$func <- no ok.
         # $func2 = { @a@$func } # <- ok.
