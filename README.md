@@ -38,6 +38,8 @@
 # ClauScript++ Example...
 
     # ToDo - end of function.?  $find = { @eu4 } FUNC_FIND DIR_START DIR END_DIR (END_FUNC?)
+    # ToDo - $get = { /./test } #"eu4"
+    # ToDo - @/./test@$get
     # Done - @eu4@$find  # <- now ok.
 
     test = "eu4"
@@ -51,6 +53,7 @@
     Event = {
         id = main
 
+    #	$print = { @/./test@$get }
         $print = { @1@2@$add@4@$add }
         $print = { \n } 
 
@@ -101,7 +104,7 @@
         $parameter = { iter name value is_user_type }	
 
         $if { 
-                $AND_ALL = { 
+                $AND = { 
                     $NOT = { $is_quoted_str = { $parameter.name } }			
                     $NOT = { $is_quoted_str = { $parameter.name } }			
                     # $COMP> = { $parameter.name 1444 }
@@ -115,7 +118,7 @@
             $set_name = { @$parameter.iter $parameter.name }
         }
         $if { 
-                $AND_ALL = { 
+                $AND = { 
                     $is_quoted_str = { $parameter.name }
                     $is_quoted_str = { $parameter.name }
 
@@ -131,7 +134,7 @@
         }
 
         $if { 
-                $AND_ALL = {
+                $AND = {
                     $NOT = { $parameter.is_user_type }
                     #$AND_ALL = {#
                         $NOT = { $is_quoted_str = { $parameter.value } }
@@ -151,7 +154,7 @@
             $set_value = { @$parameter.iter $parameter.value }
         }
         $if { 
-                $AND_ALL = { 
+                $AND = { 
                     $NOT = { $parameter.is_user_type }
                     #$AND_ALL = { 
                         $is_quoted_str = { $parameter.value }
@@ -171,6 +174,4 @@
             $set_value = { @$parameter.iter $remove_quoted = { $parameter.value } }
         }
     }
-
-
 
