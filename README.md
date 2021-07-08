@@ -6,8 +6,8 @@
         and vector of ~~
     4. ClauParser + line info + my own smart ptr? (shared, weak?)
 # ClauScript++ 구상
-    $func = { a b c "d" } 
-    /a@b@c@"d"/$func
+    $func = { a } 
+    /a/$func
     
     $if, $else, # 조건문 
     $while, # 반복문
