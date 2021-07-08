@@ -2,20 +2,26 @@
 # ClauScript++ Example...
 
 # ToDo - end of function.?  $find = { @eu4 } FUNC_FIND DIR_START DIR END_DIR (END_FUNC?)
-# ToDo - @eu4@$find  # <- now no ok.
+# Done - @eu4@$find  # <- now ok.
 
 test = "eu4"
 
-eu4 = {
-	
+Test = {
+	eu4 = {
+		
+	}
 }
 
- 
 Event = {
 	id = main
 	
+	$print = { @1@2@$add@4@$add }
+	$print = { \n } 
+	
 	# load data from file.
-	$find = { /eu4 }  
+	#$find = { /Test/eu4 }  
+	
+	@/Test/eu4@$find 
 	
 	$load_data = { $return_value = { } "C:\Users\vztpv\Desktop\Clau\ClauParser\ClauParser\input.eu4" }
 	
@@ -66,6 +72,8 @@ Event = {
 			}
 		} {
 		
+		#@$parameter.name@$print
+		
 		#$print = { $parameter.name } 
 
 		$set_name = { @$parameter.iter $parameter.name }
@@ -79,6 +87,8 @@ Event = {
 			}
 		} {
 		
+		#@$parameter.name@$print
+
 		#$print = { $parameter.name } 
 		
 		$set_name = { @$parameter.iter $remove_quoted = { $parameter.name} }
@@ -93,6 +103,10 @@ Event = {
 				#}
 			}
 		} {
+		
+		#@:@$print
+		#@$parameter.value@$print
+		#@\n@$print
 		
 		#$print = { : }
 		#$print = { $parameter.value } 
@@ -109,6 +123,11 @@ Event = {
 				#}
 			}
 		} {
+		
+		#@:@$print
+		#@$parameter.value@$print
+		#@\n@$print
+		
 		#$print = { : }
 		#$print = { $parameter.value } 
 		#$print = { \n }

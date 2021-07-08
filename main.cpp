@@ -11,7 +11,7 @@
 using namespace std::literals;
 
 
- 
+
 
 enum FUNC { FUNC_FIND, FUNC_WHILE, FUNC_RETURN_VALUE, FUNC_IS_END, FUNC_NOT,
 	FUNC_LOAD_DATA, FUNC_ENTER, FUNC_CALL, FUNC_NEXT, FUNC_RETURN, FUNC_COMP_RIGHT,
@@ -834,7 +834,6 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 								new_ut.AddUserTypeItem(clau_parser::UserType(tokens[i]));
 
 								len += _MakeByteCode(&new_ut, e);
-								break;
 							}
 							else {
 								Token token(ut);
@@ -977,7 +976,6 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 								new_ut.AddUserTypeItem(clau_parser::UserType(tokens[i]));
 
 								len += _MakeByteCode(&new_ut, e);
-								break;
 							}
 							else {
 								Token token(ut);
