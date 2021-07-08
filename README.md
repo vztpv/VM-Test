@@ -53,7 +53,7 @@
     Event = {
         id = main
 
-    #	$print = { @/./test@$get }
+    	$print = { @/./test@$get }
         $print = { @1@2@$add@4@$add }
         $print = { \n } 
 
