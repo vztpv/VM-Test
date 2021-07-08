@@ -35,8 +35,9 @@
        # make_var_int, get_var_int, set_var_int <- var_id?
 
 # ClauScript++ Example...
+
     # ToDo - end of function.?  $find = { @eu4 } FUNC_FIND DIR_START DIR END_DIR (END_FUNC?)
-    # ToDo - @eu4@$find  # <- now no ok.
+    # Done - @eu4@$find  # <- now ok.
 
     test = "eu4"
 
@@ -100,6 +101,8 @@
                 }
             } {
 
+            #@$parameter.name@$print
+
             #$print = { $parameter.name } 
 
             $set_name = { @$parameter.iter $parameter.name }
@@ -112,6 +115,8 @@
                     #$COMP> = { $remove_quoted = { $parameter.name } 1444 }
                 }
             } {
+
+            #@$parameter.name@$print
 
             #$print = { $parameter.name } 
 
@@ -128,6 +133,10 @@
                 }
             } {
 
+            #@:@$print
+            #@$parameter.value@$print
+            #@\n@$print
+
             #$print = { : }
             #$print = { $parameter.value } 
             #$print = { \n }
@@ -143,6 +152,11 @@
                     #}
                 }
             } {
+
+            #@:@$print
+            #@$parameter.value@$print
+            #@\n@$print
+
             #$print = { : }
             #$print = { $parameter.value } 
             #$print = { \n }
@@ -150,6 +164,5 @@
             $set_value = { @$parameter.iter $remove_quoted = { $parameter.value } }
         }
     }
-
 
 
