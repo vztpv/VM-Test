@@ -967,15 +967,6 @@ namespace clau_parser {
 							state = 3;
 						}
 						else if ('\"' == ch) {
-							token_last = i - 1;
-							if (token_last - token_first + 1 > 0) {
-								token_arr[token_arr_count] = Utility::Get(token_first, token_last - token_first + 1, text[token_first]);
-								token_arr_count++;
-							}
-
-							token_first = i;
-							token_last = i;
-
 							state = 1;
 						}
 						else if (Utility::isWhitespace(ch) || '\0' == ch) {
@@ -1040,14 +1031,6 @@ namespace clau_parser {
 							state = 2;
 						}
 						else if ('\"' == ch) {
-							token_last = i;
-
-							token_arr[token_arr_count] = Utility::Get(token_first, token_last - token_first + 1, text[token_first]);
-							token_arr_count++;
-
-							token_first = i + 1;
-							token_last = i + 1;
-
 							state = 0;
 						}
 					}

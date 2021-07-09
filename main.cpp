@@ -387,13 +387,14 @@ public:
 					str = str.substr(11);
 
 					Token token = x.parameter[str];
-
-					token_stack.pop_back();
-					token_stack.push_back(token);
+					dir += token.str_val; // ToString.
 				}
 				else {
 					dir += token_stack.back().str_val; // ToString
 				}
+
+				token_stack.pop_back();
+				dir += "/";
 			}
 
 			break;
@@ -401,7 +402,12 @@ public:
 			{
 				Token token;
 				token.type = Token::STRING;
-				token.str_val = dir;
+				if (dir.back() == '/') {
+					token.str_val = dir.substr(0, dir.size() - 1);
+				}
+				else {
+					token.str_val = dir;
+				}
 				token_stack.push_back(token);
 
 				dir = "";
@@ -1267,13 +1273,14 @@ Event MakeByteCode(clau_parser::UserType* ut) {
 	return e;
 }
 
+
 int main(void)
 {
 	VM vm;
 	int start = clock();
 	clau_parser::UserType global;
 	clau_parser::LoadData::LoadDataFromFile("C:\\Users\\vztpv\\source\\repos\\ClauScriptPlusPlus\\ClauScriptPlusPlus\\test.txt",
-		global, 0, 0);
+		global, 1, 0); // DO NOT change!
 
 	auto arr = global.GetUserTypeIdx("Event");
 	

@@ -2,11 +2,13 @@
 # ClauScript++ Example...
 
 # ToDo - end of function.?  $find = { @eu4 } FUNC_FIND DIR_START DIR END_DIR (END_FUNC?)
-# ToDo - $get = { /./test } #"eu4"
-# ToDo - @/./test@$get
+# DONE - $get = { /./test } #"eu4"
+# DONE - @/./test@$get
 # Done - @eu4@$find  # <- now ok.
 
-test = "eu4"
+# todo - abc"ddd"
+
+"test" = { "test" = "eu4" }
 
 Test = {
 	eu4 = {
@@ -17,7 +19,7 @@ Test = {
 Event = {
 	id = main
 	
-	$print = { @/./test@$get }	
+	$print = { @/"test"/"test"@$get }	
 	$print = { \n } 
 	$print = { @1@2@$add@4@$add }
 	$print = { \n } 
