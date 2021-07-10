@@ -2,11 +2,14 @@
 # ClauScript++ Example...
 
 # ToDo - end of function.?  $find = { @eu4 } FUNC_FIND DIR_START DIR END_DIR (END_FUNC?)
+
+# DONE - TRUE FALSE
+
 # DONE - $get = { /./test } #"eu4"
 # DONE - @/./test@$get
-# Done - @eu4@$find  # <- now ok.
+# DONE - @eu4@$find  # <- now ok.
 
-# todo - abc"ddd"
+# DONE - abc"ddd" # number of scanning thread = 1
 
 "test" = { "test" = "eu4" }
 
@@ -16,8 +19,7 @@ Test = {
 	}
 }
 
-Event = {
-	id = main
+Event = { id = main
 	
 	$print = { @/"test"/"test"@$get }	
 	$print = { \n } 
@@ -27,23 +29,22 @@ Event = {
 	# load data from file.
 	#$find = { /Test/eu4 }  
 	
-	@/Test/eu4@$find 
+	@/Test/eu4/@$find 
 	
+	# $set_option = { CALL_NO_RETURN }
 	$load_data = { $return_value = { } "C:\Users\vztpv\Desktop\Clau\ClauParser\ClauParser\input.eu4" }
 	
+	# chk return_value.. no return?
+	
+	# call
 	$call = { id = iterate workspace = @$return_value@$clone  event = test } # @$return_value ??
 
-	# @a@$func <- no ok.
-	# $func2 = { @a@$func } # <- ok.
-	
+	# $set_option = { CALL_RETURN }
 }
 
-Event = {
-	id = iterate
+Event = { id = iterate
 	
 	$parameter = { workspace event } # recursive?
-	
-	# $ <- 데이터영역?에서 $로 시작하지않는다. - 조건?
 	
 	$set_idx = { @$parameter.workspace 0 }
  	
@@ -65,15 +66,14 @@ Event = {
 	}
 }
 
-Event = {
-	id = test
+Event = { id = test
 	
 	$parameter = { iter name value is_user_type }	
 	
 	$if { 
-			$AND = { 
+			$AND_ALL = { 
 				$NOT = { $is_quoted_str = { $parameter.name } }			
-				$NOT = { $is_quoted_str = { $parameter.name } }			
+				TRUE		
 				# $COMP> = { $parameter.name 1444 }
 			}
 		} {
@@ -85,9 +85,9 @@ Event = {
 		$set_name = { @$parameter.iter $parameter.name }
 	}
 	$if { 
-			$AND = { 
+			$AND_ALL = { 
 				$is_quoted_str = { $parameter.name }
-				$is_quoted_str = { $parameter.name }
+				TRUE
 				
 				#$COMP> = { $remove_quoted = { $parameter.name } 1444 }
 			}
@@ -101,9 +101,9 @@ Event = {
 	}
 	
 	$if { 
-			$AND = {
+			$AND_ALL = {
 				$NOT = { $parameter.is_user_type }
-				#$AND_ALL = {#
+				#$AND = {#
 					$NOT = { $is_quoted_str = { $parameter.value } }
 					#$COMP> = {  $parameter.value 1444 }
 				#}
@@ -112,7 +112,7 @@ Event = {
 		
 		#@:@$print
 		#@$parameter.value@$print
-		#@\n@$print
+		##@\n@$print
 		
 		#$print = { : }
 		#$print = { $parameter.value } 
@@ -121,9 +121,9 @@ Event = {
 		$set_value = { @$parameter.iter $parameter.value }
 	}
 	$if { 
-			$AND = { 
+			$AND_ALL = { 
 				$NOT = { $parameter.is_user_type }
-				#$AND_ALL = { 
+				#$AND = { 
 					$is_quoted_str = { $parameter.value }
 					#$COMP> = { $remove_quoted = { $parameter.value } 1444 }
 				#}

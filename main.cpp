@@ -12,18 +12,19 @@ using namespace std::literals;
 
 
 
-enum FUNC { FUNC_GET, FUNC_FIND, FUNC_WHILE, FUNC_RETURN_VALUE, FUNC_IS_END, FUNC_NOT,
+enum FUNC { TRUE = 0, FALSE, FUNC_GET, FUNC_FIND, FUNC_WHILE, FUNC_RETURN_VALUE, FUNC_IS_END, FUNC_NOT,
 	FUNC_LOAD_DATA, FUNC_ENTER, FUNC_CALL, FUNC_NEXT, FUNC_RETURN, FUNC_COMP_RIGHT,
 	FUNC_ADD, FUNC_GET_IDX, FUNC_GET_SIZE, FUNC_GET_NOW, FUNC_CLONE, FUNC_QUIT, FUNC_IF, FUNC_IS_ITEM,
-	FUNC_IS_GROUP, FUNC_SET_IDX, FUNC_AND, FUNC_IS_QUOTED_STR, FUNC_COMP_LEFT, FUNC_SET_NAME, FUNC_GET_NAME, FUNC_GET_VALUE,
+	FUNC_IS_GROUP, FUNC_SET_IDX, FUNC_AND_ALL, FUNC_AND, FUNC_OR, FUNC_IS_QUOTED_STR, FUNC_COMP_LEFT, FUNC_SET_NAME, FUNC_GET_NAME, FUNC_GET_VALUE,
 		FUNC_SET_VALUE, FUNC_REMOVE_QUOTED, CONSTANT, THEN, WHILE_END, IF_END, START_DIR, DIR, END_DIR, FUNC_PRINT, NONE,
 	KEY, VALUE,  SIZE // chk?
   };
 const char* func_to_str[FUNC::SIZE] = {
+	"TRUE", "FALSE",
 	"GET",
 	"FIND", "WHILE", "RETURN_VALUE", "IS_END", "NOT", "LOAD_DATA", "ENTER", "CALL", "NEXT", "RETURN", "COMP_RIGHT",
 	"ADD", "GET_IDX", "GET_SIZE", "GET_NOW", "CLONE", "QUIT", "IF", "IS_ITEM",
-	"IS_GROUP", "SET_IDX", "AND", "IS_QUOTED_STR", "COMP_LEFT", "SET_NAME", "GET_NAME", "GET_VALUE",
+	"IS_GROUP", "SET_IDX", "AND_ALL", "AND", "OR", "IS_QUOTED_STR", "COMP_LEFT", "SET_NAME", "GET_NAME", "GET_VALUE",
 	"SET_VALUE", "REMOVE_QUOTED", "CONSTANT", "THEN", "WHILE_END", "IF_END", "START_DIR", "DIR", "END_DIR", "PRINT", "NONE", "KEY", "VALUE"
 };
 
@@ -359,6 +360,24 @@ public:
 	//std::cout << func_to_str[x.event_data[x.now]] << "\n";
 
 			switch (x.event_data[x.now]) {
+			case FUNC::TRUE:
+			{
+				Token token;
+				token.type = Token::Type::BOOL;
+				token.int_val = 1;
+
+				token_stack.push_back(token);
+			}
+				break;
+			case FUNC::FALSE:
+			{
+				Token token;
+				token.type = Token::Type::BOOL;
+				token.int_val = 0;
+
+				token_stack.push_back(token);
+			}
+				break;
 			case FUNC::FUNC_GET:
 			{
 				auto token = token_stack.back();
@@ -494,22 +513,22 @@ public:
 
 					Event e;
 
-					while (!(token_stack.back().type == Token::Type::FUNC && token_stack.back().func == FUNC::FUNC_CALL)) { 
+					for (int i = 0; i < count; ++i) {
 						auto value = token_stack.back();
 						token_stack.pop_back();
 						auto name = token_stack.back();
 						token_stack.pop_back();
 
 						if (name.str_val == "id"sv) {
-							e.id = value.str_val; 
+							e.id = value.str_val;
 
-					//		//std::cout << e.id << "\n";
+							//		//std::cout << e.id << "\n";
 
 							e.event_data = _event_list[value.str_val].event_data;
 							e.input = _event_list[value.str_val].input;
 							e.now = 0;
 							e.return_value_now = 0;
-							
+
 							break;
 						}
 						else if (value.type == Token::Type::STRING) {
@@ -676,10 +695,27 @@ public:
 			}
 			break;
 
-			case FUNC::FUNC_AND: // todo 
+			case FUNC::FUNC_AND_ALL:
 			{
 				x.now++;
+				auto count = x.event_data[x.now];
+				bool result = true;
 
+				for (int i = 0; i < count; i += 1) {
+					bool b = token_stack.back().int_val;
+					result = result && b;
+					token_stack.pop_back();
+				}
+
+				Token temp;
+				temp.int_val = result ? 1 : 0;
+				temp.type = Token::Type::BOOL;
+
+				token_stack.push_back(temp);
+			}
+			break;
+			case FUNC::FUNC_AND: 
+			{
 				bool result = true;
 
 				for (int i = 0; i < 2; i += 1) {
@@ -694,7 +730,25 @@ public:
 
 				token_stack.push_back(temp);
 			}
-				break;
+						
+			break;
+			case FUNC::FUNC_OR:
+			{
+				bool result = true;
+
+				for (int i = 0; i < 2; i += 1) {
+					bool b = token_stack.back().int_val;
+					result = result || b;
+					token_stack.pop_back();
+				}
+
+				Token temp;
+				temp.int_val = result ? 1 : 0;
+				temp.type = Token::Type::BOOL;
+
+				token_stack.push_back(temp);
+			}
+			break;
 			case FUNC::FUNC_GET_NOW:
 			{
 				auto space = token_stack.back().workspace;
@@ -841,8 +895,7 @@ private:
 };
 
 
-int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
-	int len = 0;
+void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 	long long it_count = 0, ut_count = 0;
 
 	for (long long i = 0; i < ut->GetIListSize(); ++i) {
@@ -861,8 +914,8 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 				e->event_data.push_back(FUNC::CONSTANT);
 				e->event_data.push_back(e->input->size() - 1);
 
-				len++;
-				len++;
+				
+				
 
 				{
 					auto a = ut->GetItemList(it_count).Get();
@@ -870,7 +923,7 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 					if (a._Starts_with("/")) {
 
 						e->event_data.push_back(FUNC::START_DIR);
-						len++;
+						
 						auto tokens = clau_parser::tokenize(a, '/');
 
 						for (int i = 0; i < tokens.size(); ++i) {
@@ -879,7 +932,7 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 
 								new_ut.AddUserTypeItem(clau_parser::UserType(tokens[i]));
 
-								len += _MakeByteCode(&new_ut, e);
+								_MakeByteCode(&new_ut, e);
 							}
 							else {
 								Token token(ut);
@@ -887,13 +940,13 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 								token.str_val = tokens[i];
 
 								e->input->push_back(token);
-								e->event_data.push_back(FUNC::CONSTANT); len++;
-								e->event_data.push_back(e->input->size() - 1); len++;
-								e->event_data.push_back(FUNC::DIR); len++;
+								e->event_data.push_back(FUNC::CONSTANT); 
+								e->event_data.push_back(e->input->size() - 1); 
+								e->event_data.push_back(FUNC::DIR); 
 							}
 						}
 
-						e->event_data.push_back(FUNC::END_DIR); len++;
+						e->event_data.push_back(FUNC::END_DIR); 
 					}
 					else if (a._Starts_with("@")) {
 						auto tokens = clau_parser::tokenize(a, '@');
@@ -904,7 +957,7 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 
 								new_ut.AddUserTypeItem(clau_parser::UserType(tokens[i]));
 
-								len += _MakeByteCode(&new_ut, e);
+								_MakeByteCode(&new_ut, e);
 								break;
 							}
 							else {
@@ -913,8 +966,8 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 								token.str_val = tokens[i];
 
 								e->input->push_back(token);
-								e->event_data.push_back(FUNC::CONSTANT); len++;
-								e->event_data.push_back(e->input->size() - 1); len++;
+								e->event_data.push_back(FUNC::CONSTANT); 
+								e->event_data.push_back(e->input->size() - 1); 
 							}
 						}
 					}
@@ -925,8 +978,8 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 
 						e->input->push_back(token);
 
-						e->event_data.push_back(FUNC::CONSTANT); len++;
-						e->event_data.push_back(e->input->size() - 1); len++;
+						e->event_data.push_back(FUNC::CONSTANT); 
+						e->event_data.push_back(e->input->size() - 1); 
 					}
 				}
 			}
@@ -934,51 +987,56 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 			// $while, $if
 			else if (ut->GetItemList(it_count).GetName().empty()) {
 				if (ut->GetItemList(it_count).Get() == "$while"sv) {
-					e->event_data.push_back(FUNC::FUNC_WHILE); len++;
+					e->event_data.push_back(FUNC::FUNC_WHILE); 
 					int idx = e->event_data.size() - 1;
 					int then_idx = 0;
-					int count1 = _MakeByteCode(ut->GetUserTypeList(ut_count), e);
-					len += count1;
+
+					_MakeByteCode(ut->GetUserTypeList(ut_count), e);
 
 					ut_count++; ++i;
 
-					e->event_data.push_back(FUNC::THEN); len++;
-					e->event_data.push_back(0); len++;
+					e->event_data.push_back(FUNC::THEN); 
+					e->event_data.push_back(0); 
 					then_idx = e->event_data.size() - 1;
 					{
 						//Event _e;
 						//int count2 = _MakeByteCode(ut->GetUserTypeList(ut_count), &_e);
-						//len += count2;
-						//e->event_data.push_back(0); len++;
+						//count2;
+						//e->event_data.push_back(0); 
 					}
 
+					_MakeByteCode(ut->GetUserTypeList(ut_count), e);
 
-					int count2 = _MakeByteCode(ut->GetUserTypeList(ut_count), e);
-					len += count2;
 					ut_count++; ++i;
 
-					e->event_data.push_back(FUNC::WHILE_END); len++;
-					e->event_data.push_back(idx); len++;
+					e->event_data.push_back(FUNC::WHILE_END); 
+					e->event_data.push_back(idx); 
 
-					e->event_data[then_idx] = e->event_data.size(); len++;
+					e->event_data[then_idx] = e->event_data.size(); //
 				}
 				else if (ut->GetItemList(it_count).Get() == "$if"sv) {
-					e->event_data.push_back(FUNC::FUNC_IF); len++;
+					e->event_data.push_back(FUNC::FUNC_IF); 
 					int idx = 0;
 
-					len += _MakeByteCode(ut->GetUserTypeList(ut_count), e);
+					_MakeByteCode(ut->GetUserTypeList(ut_count), e);
 					ut_count++; ++i;
 
-					e->event_data.push_back(FUNC::THEN); len++;
-					e->event_data.push_back(0); len++;
+					e->event_data.push_back(FUNC::THEN); 
+					e->event_data.push_back(0); 
 					idx = e->event_data.size() - 1;
 
-					len += _MakeByteCode(ut->GetUserTypeList(ut_count), e);
+					_MakeByteCode(ut->GetUserTypeList(ut_count), e);
 
 					ut_count++; ++i;
 
 					e->event_data.push_back(FUNC::IF_END);
-					e->event_data[idx] = e->event_data.size(); len++;
+					e->event_data[idx] = e->event_data.size(); 
+				}
+				else if (ut->GetItemList(it_count).Get() == "TRUE"sv) {
+					e->event_data.push_back(FUNC::TRUE); 
+				}
+				else if (ut->GetItemList(it_count).Get() == "FALSE"sv) {
+					e->event_data.push_back(FUNC::FALSE); 
 				}
 				else  {
 					auto a = ut->GetItemList(it_count).Get();
@@ -986,7 +1044,7 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 					if (a._Starts_with("/")) {
 
 						e->event_data.push_back(FUNC::START_DIR);
-						len++;
+						
 						auto tokens = clau_parser::tokenize(a, '/');
 
 						for (int i = 0; i < tokens.size(); ++i) {
@@ -995,7 +1053,7 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 
 								new_ut.AddUserTypeItem(clau_parser::UserType(tokens[i]));
 
-								len += _MakeByteCode(&new_ut, e);
+								_MakeByteCode(&new_ut, e);
 								break;
 							}
 							else {
@@ -1004,13 +1062,13 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 								token.str_val = tokens[i];
 
 								e->input->push_back(token);
-								e->event_data.push_back(FUNC::CONSTANT); len++;
-								e->event_data.push_back(e->input->size() - 1); len++;
-								e->event_data.push_back(FUNC::DIR); len++;
+								e->event_data.push_back(FUNC::CONSTANT); 
+								e->event_data.push_back(e->input->size() - 1); 
+								e->event_data.push_back(FUNC::DIR); 
 							}
 						}
 
-						e->event_data.push_back(FUNC::END_DIR); len++;
+						e->event_data.push_back(FUNC::END_DIR); 
 					}
 					else if (a._Starts_with("@")) {
 						auto tokens = clau_parser::tokenize(a, '@');
@@ -1021,7 +1079,7 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 
 								new_ut.AddUserTypeItem(clau_parser::UserType(tokens[i]));
 
-								len += _MakeByteCode(&new_ut, e);
+								_MakeByteCode(&new_ut, e);
 							}
 							else {
 								Token token(ut);
@@ -1029,8 +1087,8 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 								token.str_val = tokens[i];
 
 								e->input->push_back(token);
-								e->event_data.push_back(FUNC::CONSTANT); len++;
-								e->event_data.push_back(e->input->size() - 1); len++;
+								e->event_data.push_back(FUNC::CONSTANT); 
+								e->event_data.push_back(e->input->size() - 1); 
 							}
 						}
 					}
@@ -1041,8 +1099,8 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 
 						e->input->push_back(token);
 
-						e->event_data.push_back(FUNC::CONSTANT); len++;
-						e->event_data.push_back(e->input->size() - 1); len++;
+						e->event_data.push_back(FUNC::CONSTANT); 
+						e->event_data.push_back(e->input->size() - 1); 
 					}
 				}
 			}
@@ -1057,8 +1115,8 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 				call_flag = true;
 			}
 
-			int count = _MakeByteCode(ut->GetUserTypeList(ut_count), e);
-			len += count;
+			 _MakeByteCode(ut->GetUserTypeList(ut_count), e);
+			
 
 			if (!ut->GetUserTypeList(ut_count)->GetName().empty()) {
 				if (name._Starts_with("$")) {
@@ -1068,81 +1126,75 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 					if (name == "$clone"sv) {
 						token.func = FUNC::FUNC_CLONE;
 
-						e->event_data.push_back(FUNC::FUNC_CLONE); len++;
+						e->event_data.push_back(FUNC::FUNC_CLONE); 
 					}
 					else if (name == "$call"sv) {
 						token.func = FUNC::FUNC_CALL;
 
-						e->event_data.push_back(FUNC::FUNC_CALL); len++;
-						e->event_data.push_back(count); len++;
+						e->event_data.push_back(FUNC::FUNC_CALL); 
+						e->event_data.push_back(ut->GetUserTypeList(ut_count)->GetItemListSize()); 
 
 					}
 					else if (name == "$set_idx"sv) {
 						token.func = FUNC::FUNC_SET_IDX;
 						
-						e->event_data.push_back(FUNC::FUNC_SET_IDX); len++;
+						e->event_data.push_back(FUNC::FUNC_SET_IDX); 
 					}
 					else if (name == "$add"sv) {
 						token.func = FUNC::FUNC_ADD;
 
-						e->event_data.push_back(FUNC::FUNC_ADD); len++;
+						e->event_data.push_back(FUNC::FUNC_ADD); 
 					}
 					else if (name == "$get"sv) {
 						token.func = FUNC::FUNC_GET;
 						
-						e->event_data.push_back(FUNC::FUNC_GET); len++;
+						e->event_data.push_back(FUNC::FUNC_GET); 
 					}
 					else if (name == "$get_name"sv) {
 						token.func = FUNC::FUNC_GET_NAME;
 
-						e->event_data.push_back(FUNC::FUNC_GET_NAME); len++;
+						e->event_data.push_back(FUNC::FUNC_GET_NAME); 
 					}
 					else if (name == "$find"sv) {
 						token.func = FUNC::FUNC_FIND;
 
-						e->event_data.push_back(FUNC::FUNC_FIND); len++;
+						e->event_data.push_back(FUNC::FUNC_FIND); 
 					}
 					else if (name == "$NOT"sv) {
 						token.func = FUNC::FUNC_NOT;
 
-						e->event_data.push_back(FUNC::FUNC_NOT); len++;
+						e->event_data.push_back(FUNC::FUNC_NOT); 
 					}
 					else if (name == "$is_end"sv) {
 						token.func = FUNC::FUNC_IS_END;
 
-						e->event_data.push_back(FUNC::FUNC_IS_END); len++;
+						e->event_data.push_back(FUNC::FUNC_IS_END); 
 					}
 					else if (name == "$load_data"sv) {
 						token.func = FUNC::FUNC_LOAD_DATA;
 
-						e->event_data.push_back(FUNC::FUNC_LOAD_DATA); len++;
-					}
-					else if (name == "$is_end"sv) {
-						token.func = FUNC::FUNC_IS_END;
-
-						e->event_data.push_back(FUNC::FUNC_IS_END); len++;
+						e->event_data.push_back(FUNC::FUNC_LOAD_DATA); 
 					}
 					else if (name == "$next"sv) {
 						token.func = FUNC::FUNC_NEXT;
 
-						e->event_data.push_back(FUNC::FUNC_NEXT); len++;
+						e->event_data.push_back(FUNC::FUNC_NEXT); 
 					}
 					else if (name == "$enter") {
 						token.func = FUNC::FUNC_ENTER;
 
-						e->event_data.push_back(FUNC::FUNC_ENTER); len++;
+						e->event_data.push_back(FUNC::FUNC_ENTER); 
 					}
 					else if (name == "$quit") {
 						token.func = FUNC::FUNC_QUIT;
 
-						e->event_data.push_back(FUNC::FUNC_QUIT); len++;
+						e->event_data.push_back(FUNC::FUNC_QUIT); 
 					}
 					else if (name == "$parameter"sv) {
-						for (int i = 0; i < count; i += 2) {
+						for (int i = 0; i < ut->GetUserTypeList(ut_count)->GetItemListSize(); ++i) {
 							
 							auto name = (*e->input)[e->event_data.back()].str_val;
-							e->event_data.pop_back();
-							e->event_data.pop_back();
+							e->event_data.pop_back(); 
 
 							e->parameter[name] = Token();
 						}
@@ -1150,79 +1202,89 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 					else if (name == "$COMP<"sv) {
 						token.func = FUNC::FUNC_COMP_RIGHT;
 
-						e->event_data.push_back(FUNC::FUNC_COMP_RIGHT); len++;
+						e->event_data.push_back(FUNC::FUNC_COMP_RIGHT); 
 					}
 					else if (name == "$COMP>"sv) {
 						token.func = FUNC::FUNC_COMP_LEFT;
 
-						e->event_data.push_back(FUNC::FUNC_COMP_LEFT); len++;
+						e->event_data.push_back(FUNC::FUNC_COMP_LEFT); 
+					}
+					else if (name == "$AND_ALL") {
+						token.func = FUNC::FUNC_AND_ALL;
+
+						e->event_data.push_back(FUNC::FUNC_AND_ALL); 
+						e->event_data.push_back(ut->GetUserTypeList(ut_count)->GetIListSize()); 
 					}
 					else if (name == "$AND") {
 						token.func = FUNC::FUNC_AND;
 
-						e->event_data.push_back(FUNC::FUNC_AND); len++;
-						e->event_data.push_back(count); len++;
+						e->event_data.push_back(FUNC::FUNC_AND); 
+					}
+					else if (name == "$OR") {
+						token.func = FUNC::FUNC_OR;
+
+						e->event_data.push_back(FUNC::FUNC_OR); 
 					}
 					else if (name == "$get_size"sv) {
 						token.func = FUNC::FUNC_GET_SIZE;
 
-						e->event_data.push_back(FUNC::FUNC_GET_SIZE); len++;
+						e->event_data.push_back(FUNC::FUNC_GET_SIZE); 
 					}
 					else if (name == "$get_idx"sv) {
 						token.func = FUNC::FUNC_GET_IDX;
 
-						e->event_data.push_back(FUNC::FUNC_GET_IDX); len++;
+						e->event_data.push_back(FUNC::FUNC_GET_IDX); 
 					}
 					else if (name == "$return_value"sv) {
 						token.func = FUNC::FUNC_RETURN_VALUE;
 
-						e->event_data.push_back(FUNC::FUNC_RETURN_VALUE); len++;
+						e->event_data.push_back(FUNC::FUNC_RETURN_VALUE); 
 					}
 					else if (name == "$set_name"sv) {
 						token.func = FUNC::FUNC_SET_NAME;
 
-						e->event_data.push_back(FUNC::FUNC_SET_NAME); len++;
+						e->event_data.push_back(FUNC::FUNC_SET_NAME); 
 					}
 					else if (name == "$get_value") {
 						token.func = FUNC::FUNC_GET_VALUE;
 
-						e->event_data.push_back(FUNC::FUNC_GET_VALUE); len++;
+						e->event_data.push_back(FUNC::FUNC_GET_VALUE); 
 					}
 					else if (name == "$set_value"sv) {
 						token.func = FUNC::FUNC_SET_VALUE;
 
-						e->event_data.push_back(FUNC::FUNC_SET_VALUE); len++;
+						e->event_data.push_back(FUNC::FUNC_SET_VALUE); 
 					}
 					else if (name == "$is_item"sv) {
 						token.func = FUNC::FUNC_IS_ITEM;
 
-						e->event_data.push_back(FUNC::FUNC_IS_ITEM); len++;
+						e->event_data.push_back(FUNC::FUNC_IS_ITEM); 
 					}
 					else if (name == "$is_group"sv) {
 						token.func = FUNC::FUNC_IS_GROUP;
 
-						e->event_data.push_back(FUNC::FUNC_IS_GROUP); len++;
+						e->event_data.push_back(FUNC::FUNC_IS_GROUP); 
 					}
 					else if (name == "$is_quoted_str"sv) {
 						token.func = FUNC::FUNC_IS_QUOTED_STR;
 
-						e->event_data.push_back(FUNC::FUNC_IS_QUOTED_STR); len++;
+						e->event_data.push_back(FUNC::FUNC_IS_QUOTED_STR); 
 					}
 					else if (name == "$remove_quoted"sv) {
 						token.func = FUNC::FUNC_REMOVE_QUOTED;
 
-						e->event_data.push_back(FUNC::FUNC_REMOVE_QUOTED); len++;
+						e->event_data.push_back(FUNC::FUNC_REMOVE_QUOTED); 
 					}
 					else if (name == "$get_now"sv) {
 
 						token.func = FUNC::FUNC_GET_NOW;
 
-						e->event_data.push_back(FUNC::FUNC_GET_NOW); len++;
+						e->event_data.push_back(FUNC::FUNC_GET_NOW); 
 					}
 					else if (name == "$print"sv) {	
 						token.func = FUNC::FUNC_PRINT;
 
-						e->event_data.push_back(FUNC::FUNC_PRINT); len++;
+						e->event_data.push_back(FUNC::FUNC_PRINT); 
 					}
 
 					// todo - add processing. errors..
@@ -1236,15 +1298,14 @@ int _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 					token.type = Token::Type::STRING;
 
 					e->input->push_back(token);
-					e->event_data.push_back(FUNC::CONSTANT); len++;
-					e->event_data.push_back(e->input->size() - 1); len++;
+					e->event_data.push_back(FUNC::CONSTANT); 
+					e->event_data.push_back(e->input->size() - 1); 
 				}
 			}
 
 			ut_count++;
 		}
 	}
-	return len;
 }
 
 void Debug(const Event& e) {
