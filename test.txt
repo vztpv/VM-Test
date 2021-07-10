@@ -73,7 +73,8 @@ Event = { id = test
 	$if { 
 			$AND_ALL = { 
 				$NOT = { $is_quoted_str = { $parameter.name } }			
-				TRUE		
+				TRUE
+				TRUE				
 				# $COMP> = { $parameter.name 1444 }
 			}
 		} {

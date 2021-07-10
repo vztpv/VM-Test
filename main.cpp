@@ -383,11 +383,6 @@ public:
 				auto token = token_stack.back();
 				token_stack.pop_back();
 
-				/// <summary>
-				/// Todo - from clauscript 
-				/// </summary>
-				/// <param name="id"></param>
-				/// <param name="global"></param>
 				auto value = FindValue(global, token.str_val); // ToString?
 
 				token_stack.push_back(value[0]);
@@ -483,7 +478,7 @@ public:
 						}
 					}
 
-					{
+					{ 
 						token_stack.push_back(value);
 					}
 				}
@@ -905,17 +900,17 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 					it_count++;
 					continue;
 				}
+			
+				{
+					Token token(ut);
+					token.type = Token::Type::STRING;
+					token.str_val = ut->GetItemList(it_count).GetName();
 
-				Token token(ut);
-				token.type = Token::Type::STRING;
-				token.str_val = ut->GetItemList(it_count).GetName();
-
-				e->input->push_back(token);
+					e->input->push_back(token);
+				}
+				
 				e->event_data.push_back(FUNC::CONSTANT);
 				e->event_data.push_back(e->input->size() - 1);
-
-				
-				
 
 				{
 					auto a = ut->GetItemList(it_count).Get();
@@ -1114,9 +1109,8 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 			if (name == "$call"sv) {
 				call_flag = true;
 			}
-
-			 _MakeByteCode(ut->GetUserTypeList(ut_count), e);
 			
+			_MakeByteCode(ut->GetUserTypeList(ut_count), e);
 
 			if (!ut->GetUserTypeList(ut_count)->GetName().empty()) {
 				if (name._Starts_with("$")) {
@@ -1195,7 +1189,8 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 							
 							auto name = (*e->input)[e->event_data.back()].str_val;
 							e->event_data.pop_back(); 
-
+							e->event_data.pop_back();
+							
 							e->parameter[name] = Token();
 						}
 					}
