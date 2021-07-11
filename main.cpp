@@ -6,8 +6,11 @@
 #include <regex>
 #include <map>
 #include <unordered_map>
+
 #include "clau_parser.h"
+
 #include "smart_ptr.h"
+
 using namespace std::literals;
 
 
@@ -41,20 +44,212 @@ public:
 
 class Token {
 public:
-	long long int_val = 0;
-	long double float_val = 0;
-	std::string str_val;
 	FUNC func = FUNC::NONE;
-	Workspace workspace;
+private:
+	mutable long long int_val = 0;
+	mutable long double float_val = 0;
+	mutable std::string str_val;
+
 	enum Type { INT = 1, FLOAT = 2, STRING = 4, FUNC = 8, USERTYPE = 16, WORKSPACE = 32, BOOL = 64, NONE = 128 };
-	Type type = Type::NONE;
+	mutable Type type = Type::NONE;
+
+public:
+	Workspace workspace;
 	long long line = 0;
 
 	Token(clau_parser::UserType* ut = nullptr) : workspace(ut) {
 		//
 	}
 
-	// ToString();
+	inline std::string ToString() const {
+		if (type & Type::STRING) {
+			return str_val;
+		}
+
+		if (type & Type::INT) {
+			str_val = std::to_string(int_val);
+			type = static_cast<Type>(type | Type::STRING);
+			return str_val;
+		}
+
+		if (type & Type::FLOAT) {
+			str_val = std::to_string(float_val);
+			type = static_cast<Type>(type | Type::STRING);
+			return str_val;
+		}
+
+		return {};
+	}
+	long long ToInt() const {
+		if (type & Type::INT) {
+			return int_val;
+		}
+
+		if (type & Type::FLOAT) {
+			return float_val;
+		}
+
+		if (type & Type::STRING) {
+			int_val = std::stoll(str_val);
+			type = static_cast<Type>(type | Type::INT);
+			return int_val;
+		}
+
+		return 0;
+	}
+	long double ToFloat() const {
+		if (type & Type::FLOAT) {
+			return float_val;
+		}
+
+		if (type & Type::INT) {
+			return int_val;
+		}
+
+		if (type & Type::STRING) {
+			float_val = std::stold(str_val);
+			type = static_cast<Type>(type | Type::FLOAT);
+			return float_val;
+		}
+
+		return 0;
+	}
+	bool ToBool() const {
+		if (type & Type::BOOL) {
+			return int_val == 1;
+		}
+
+		if (type & Type::INT) {
+			type = static_cast<Type>(type | Type::BOOL);
+			return int_val;
+		}
+
+		if (type & Type::FLOAT) {
+			type = static_cast<Type>(type | Type::BOOL);
+			return float_val;
+		}
+
+		return false;
+	}
+	void SetString(const std::string& str) {
+		str_val = str;
+		type = Type::STRING;
+	}
+	void SetInt(long long x) {
+		int_val = x;
+		type = Type::INT;
+	}
+	void SetFloat(long double x) {
+		float_val = x;
+		type = Type::FLOAT;
+	}
+	void SetWorkspace(wiz::SmartPtr<clau_parser::Reader> ptr) {
+		workspace.reader = ptr;
+		type = Type::WORKSPACE;
+	}
+	void SetBool(bool x) {
+		int_val = x ? 1 : 0;
+		type = Type::BOOL;
+	}
+	void SetFunc() {
+		type = Type::FUNC;
+	}
+
+	bool IsInt() const {
+		if (type & Type::INT) {
+			return true;
+		}
+
+		if (type & Type::STRING) {
+
+			int state = 0;
+			const auto& str = str_val;
+
+			for (int i = 0; i < str.size(); ++i) {
+				switch (state)
+				{
+				case 0:
+					if ('+' == str[i] || '-' == str[i]) {
+						state = 0;
+					}
+					else if (str[i] >= '0' && str[i] <= '9')
+					{
+						state = 1;
+					}
+					else return false;
+					break;
+				case 1:
+					if (str[i] >= '0' && str[i] <= '9') {
+						state = 1;
+					}
+					else return false;
+				}
+			}
+			if (1 == state) {
+				//type = static_cast<Type>(type | Type::INT);
+				//int_val = std::stoll(str_val);
+				return true;
+			}
+		}
+
+		return false;
+	}
+	bool IsFloat() const {
+		if (type & Type::FLOAT) {
+			return true;
+		}
+		
+		if (type & Type::STRING) {
+			int state = 0;
+			const auto& str = str_val;
+
+			for (int i = 0; i < str.size(); ++i) {
+				switch (state)
+				{
+				case 0:
+					if ('+' == str[i] || '-' == str[i]) {
+						state = 0;
+					}
+					else if (str[i] >= '0' && str[i] <= '9')
+					{
+						state = 1;
+					}
+					else { return false; }
+					break;
+				case 1:
+					if (str[i] >= '0' && str[i] <= '9') {
+						state = 1;
+					}
+					else if (str[i] == '.') {
+						state = 2;
+					}
+					else { return false; }
+					break;
+				case 2:
+					if (str[i] >= '0' && str[i] <= '9') { state = 3; }
+					else { return false; }
+					break;
+				case 3:
+					if (str[i] >= '0' && str[i] <= '9') { state = 3; }
+					else { return false; }
+					break;
+				}
+			}
+			if (state == 3) {
+				//type = static_cast<Type>(type | Type::FLOAT);
+				//float_val = std::stold(str_val);
+				return true;
+			}
+		}
+
+		return false;
+	}
+	bool IsString() const {
+		return type & Type::STRING;
+	}
+	bool IsBool() const {
+		return type & Type::BOOL;
+	}
 };
 
 
@@ -76,7 +271,7 @@ static std::vector<Token> FindValue(clau_parser::UserType* ut, const std::string
 	if (count == 1)
 	{ 
 		Token token;
-		token.type = Token::Type::STRING;
+		token.SetString({});
 		return { token };
 	}
 	else {
@@ -91,8 +286,7 @@ static std::vector<Token> FindValue(clau_parser::UserType* ut, const std::string
 				int itemIdx = std::stoi(itemName.substr(3));
 
 				Token temp;
-				temp.type = Token::Type::STRING;
-				temp.str_val = (x.second[i]->GetItemList(itemIdx).Get(0));
+				temp.SetString(x.second[i]->GetItemList(itemIdx).Get(0));
 				result.push_back(temp);
 			}
 			else {
@@ -103,8 +297,7 @@ static std::vector<Token> FindValue(clau_parser::UserType* ut, const std::string
 				if (!temp.empty()) {
 					for (int j = 0; j < temp.size(); ++j) {
 						Token tkn;
-						tkn.type = Token::Type::STRING;
-						tkn.str_val = temp[j].Get(0);
+						tkn.SetString(temp[j].Get(0));
 
 						result.push_back(tkn);
 					}
@@ -334,8 +527,7 @@ private:
 
 		for (long long i = 0; i < uts.second.size(); ++i) {
 			Token _token;
-			_token.type = Token::Type::WORKSPACE;
-			_token.workspace.reader = new clau_parser::Reader(uts.second[i]);
+			_token.SetWorkspace(new clau_parser::Reader(uts.second[i]));
 			result.push_back(_token);
 		}
 		
@@ -357,14 +549,13 @@ public:
 			auto& x = _stack.back();
 			count++;
 
-	//std::cout << func_to_str[x.event_data[x.now]] << "\n";
+			//std::cout << func_to_str[x.event_data[x.now]] << "\n";
 
 			switch (x.event_data[x.now]) {
 			case FUNC::TRUE:
 			{
 				Token token;
-				token.type = Token::Type::BOOL;
-				token.int_val = 1;
+				token.SetBool(true);
 
 				token_stack.push_back(token);
 			}
@@ -372,8 +563,7 @@ public:
 			case FUNC::FALSE:
 			{
 				Token token;
-				token.type = Token::Type::BOOL;
-				token.int_val = 0;
+				token.SetBool(false);
 
 				token_stack.push_back(token);
 			}
@@ -383,7 +573,7 @@ public:
 				auto token = token_stack.back();
 				token_stack.pop_back();
 
-				auto value = FindValue(global, token.str_val); // ToString?
+				auto value = FindValue(global, token.ToString()); // ToString?
 
 				token_stack.push_back(value[0]);
 			}
@@ -393,18 +583,18 @@ public:
 				dir = "/";
 				break;
 			case FUNC::DIR:
-				////std::cout << "DIR chk" << token_stack.back().str_val << "\n";
+				////std::cout << "DIR chk" << token_stack.back().ToString() << "\n";
 			{
-				auto str = token_stack.back().str_val;
+				auto str = token_stack.back().ToString();
 
 				if (str._Starts_with("$parameter.")) {
 					str = str.substr(11);
 
 					Token token = x.parameter[str];
-					dir += token.str_val; // ToString.
+					dir += token.ToString(); // ToString.
 				}
 				else {
-					dir += token_stack.back().str_val; // ToString
+					dir += token_stack.back().ToString(); // ToString
 				}
 
 				token_stack.pop_back();
@@ -415,12 +605,12 @@ public:
 			case FUNC::END_DIR:
 			{
 				Token token;
-				token.type = Token::STRING;
+				
 				if (dir.back() == '/') {
-					token.str_val = dir.substr(0, dir.size() - 1);
+					token.SetString(dir.substr(0, dir.size() - 1));
 				}
 				else {
-					token.str_val = dir;
+					token.SetString(dir);
 				}
 				token_stack.push_back(token);
 
@@ -430,7 +620,7 @@ public:
 			break;
 			case FUNC::FUNC_REMOVE_QUOTED:
 			{
-				auto str = token_stack.back().str_val;
+				auto str = token_stack.back().ToString();
 
 				if (str.size() >= 2) {
 					str = str.substr(1, str.size() - 2);
@@ -438,21 +628,21 @@ public:
 				token_stack.pop_back();
 
 				Token temp;
-				temp.str_val = str;
-				temp.type = Token::Type::STRING;
+				temp.SetString(str);
 				token_stack.push_back(temp);
 			}
 				break;
 			case FUNC::FUNC_IS_QUOTED_STR:
 			{
-				auto str = token_stack.back().str_val;
+				auto str = token_stack.back().ToString();
 				bool chk = str.size() >= 2 && str[0] == str.back() && str.back() == '\"';
 
 				token_stack.pop_back();
 
 				Token temp;
-				temp.int_val = chk ? 1 : 0;
-				temp.type = Token::Type::BOOL;
+				
+				temp.SetBool(chk);
+
 				token_stack.push_back(temp);
 				break;
 			}
@@ -467,9 +657,9 @@ public:
 				{
 					const auto& value = (*x.input)[x.event_data[x.now]];
 
-					if (value.type == Token::Type::STRING) {
-						if (value.str_val._Starts_with("$parameter.")) {
-							auto param = value.str_val.substr(11);
+					if (value.IsString()) {
+						if (value.ToString()._Starts_with("$parameter.")) {
+							auto param = value.ToString().substr(11);
 
 							token_stack.push_back(x.parameter[param]);
 
@@ -486,14 +676,21 @@ public:
 				break;
 			case FUNC::FUNC_ADD:
 			{
-				long long a = std::stoll(token_stack.back().str_val);
+				auto a = token_stack.back();
 				token_stack.pop_back();
-				long long b = std::stoll(token_stack.back().str_val);
+				auto b = token_stack.back();
 				token_stack.pop_back();
+
 				{
 					Token token;
-					token.str_val = std::to_string(a + b);
-					token.type = Token::Type::STRING;
+
+					if (a.IsFloat() && b.IsFloat()) {
+						token.SetFloat(a.ToFloat() + b.ToFloat());
+					}
+					else if(a.IsInt() && b.IsInt()) {
+						token.SetInt(a.ToInt() + b.ToInt());
+					}
+
 					token_stack.push_back(token);
 				}
 			}
@@ -514,29 +711,29 @@ public:
 						auto name = token_stack.back();
 						token_stack.pop_back();
 
-						if (name.str_val == "id"sv) {
-							e.id = value.str_val;
+						if (name.ToString() == "id"sv) {
+							e.id = value.ToString();
 
 							//		//std::cout << e.id << "\n";
 
-							e.event_data = _event_list[value.str_val].event_data;
-							e.input = _event_list[value.str_val].input;
+							e.event_data = _event_list[value.ToString()].event_data;
+							e.input = _event_list[value.ToString()].input;
 							e.now = 0;
 							e.return_value_now = 0;
 
 							break;
 						}
-						else if (value.type == Token::Type::STRING) {
-							if (value.str_val._Starts_with("/$parameter.")) {
-								value = x.parameter[value.str_val.substr(11)];
+						else if (value.IsString()) {
+							if (value.ToString()._Starts_with("/$parameter.")) {
+								value = x.parameter[value.ToString().substr(11)];
 
-								if (value.str_val._Starts_with("$return_value")) {
+								if (value.ToString()._Starts_with("$return_value")) {
 									value = x.return_value[x.return_value_now];
 								}
 							}
 						}
 
-						e.parameter[name.str_val] = std::move(value); // name.ToString()
+						e.parameter[name.ToString()] = std::move(value); // name.ToString()
 					}
 
 					////std::cout << "call " << e.id << "\n";
@@ -546,33 +743,53 @@ public:
 				continue;
 
 				break;
+
+				// do not compare bools
 			case FUNC::FUNC_COMP_LEFT:
 				// Compare!
 			{
-				auto b = token_stack.back().str_val;
+				auto a = token_stack.back();
 				token_stack.pop_back();
-				auto a =  token_stack.back().str_val;
+				auto b = token_stack.back();
 				token_stack.pop_back();
 
 				{
 					Token token;
-					token.int_val = a > b;
-					token.type = Token::Type::BOOL;
+
+					if (a.IsFloat() && b.IsFloat()) {
+						token.SetBool(a.ToFloat() > b.ToFloat());
+					}
+					else if (a.IsInt() && b.IsInt()) {
+						token.SetBool(a.ToInt() > b.ToInt());
+					}
+					else if (a.IsString() && b.IsString()) {
+						token.SetBool(a.ToString() > b.ToString());
+					}
+
 					token_stack.push_back(token);
 				}
 			}
 			break;
 			case FUNC::FUNC_COMP_RIGHT:
 			{
-				long long b = std::stoll(token_stack.back().str_val);
+				auto b = token_stack.back();
 				token_stack.pop_back();
-				long long a = std::stoll(token_stack.back().str_val);
+				auto a = token_stack.back();
 				token_stack.pop_back();
 
 				{
 					Token token;
-					token.int_val = a < b;
-					token.type = Token::Type::BOOL;
+
+					if (a.IsFloat() && b.IsFloat()) {
+						token.SetBool(a.ToFloat() < b.ToFloat());
+					}
+					else if (a.IsInt() && b.IsInt()) {
+						token.SetBool(a.ToInt() < b.ToInt());
+					}
+					else if (a.IsString() && b.IsString()) {
+						token.SetBool(a.ToString() < b.ToString());
+					}
+					
 					token_stack.push_back(token);
 				}
 			}
@@ -582,7 +799,7 @@ public:
 				auto a = token_stack.back();
 				token_stack.pop_back();
 
-				x.return_value = Find(global, a.str_val);
+				x.return_value = Find(global, a.ToString());
 				x.return_value_now = 0;
 			}
 			break;
@@ -596,7 +813,7 @@ public:
 				break;
 			case FUNC::FUNC_LOAD_DATA:
 			{
-				std::string fileName = token_stack.back().str_val;
+				std::string fileName = token_stack.back().ToString();
 				fileName = fileName.substr(1, fileName.size() - 2);
 				token_stack.pop_back();
 
@@ -619,7 +836,7 @@ public:
 				break;
 			case FUNC::FUNC_SET_NAME:
 			{
-				auto name = token_stack.back().str_val;
+				auto name = token_stack.back().ToString();
 				
 				token_stack.pop_back();
 
@@ -630,7 +847,7 @@ public:
 			break;
 			case FUNC::FUNC_SET_VALUE:
 			{
-				auto value = token_stack.back().str_val;
+				auto value = token_stack.back().ToString();
 				
 				token_stack.pop_back();
 
@@ -642,8 +859,7 @@ public:
 			case FUNC::FUNC_GET_NAME:
 			{
 				Token token;
-				token.type = Token::Type::STRING;
-				token.str_val = token_stack.back().workspace.reader->GetKey();
+				token.SetString(token_stack.back().workspace.reader->GetKey());
 
 				token_stack.pop_back();
 				token_stack.push_back(token);
@@ -652,8 +868,7 @@ public:
 			case FUNC::FUNC_GET_VALUE:
 			{
 				Token token;
-				token.type = Token::Type::STRING;
-				token.str_val = token_stack.back().workspace.reader->GetData();
+				token.SetString(token_stack.back().workspace.reader->GetData());
 
 				token_stack.pop_back();
 				token_stack.push_back(token);
@@ -662,8 +877,7 @@ public:
 			case FUNC::FUNC_GET_IDX:
 			{
 				Token token;
-				token.type = Token::Type::STRING;
-				token.str_val = std::to_string(token_stack.back().workspace.reader->GetIdx());
+				token.SetInt(token_stack.back().workspace.reader->GetIdx());
 
 				token_stack.pop_back();
 				token_stack.push_back(token);
@@ -672,9 +886,9 @@ public:
 
 			case FUNC::FUNC_SET_IDX:
 			{
-				//auto a = std::stoll(x.input[x.event_data[x.now]].str_val);
+				//auto a = std::stoll(x.input[x.event_data[x.now]].ToString());
 
-				auto a = std::stoll(token_stack.back().str_val);
+				auto a = token_stack.back().ToInt();
 				token_stack.pop_back();
 
 				auto space = token_stack.back().workspace;
@@ -697,14 +911,13 @@ public:
 				bool result = true;
 
 				for (int i = 0; i < count; i += 1) {
-					bool b = token_stack.back().int_val;
+					bool b = token_stack.back().ToBool();
 					result = result && b;
 					token_stack.pop_back();
 				}
 
 				Token temp;
-				temp.int_val = result ? 1 : 0;
-				temp.type = Token::Type::BOOL;
+				temp.SetBool(result);
 
 				token_stack.push_back(temp);
 			}
@@ -714,14 +927,13 @@ public:
 				bool result = true;
 
 				for (int i = 0; i < 2; i += 1) {
-					bool b = token_stack.back().int_val;
+					bool b = token_stack.back().ToBool();
 					result = result && b;
 					token_stack.pop_back();
 				}
 
 				Token temp;
-				temp.int_val = result ? 1 : 0;
-				temp.type = Token::Type::BOOL;
+				temp.SetBool(result);
 
 				token_stack.push_back(temp);
 			}
@@ -732,14 +944,14 @@ public:
 				bool result = true;
 
 				for (int i = 0; i < 2; i += 1) {
-					bool b = token_stack.back().int_val;
+					bool b = token_stack.back().ToBool();
 					result = result || b;
 					token_stack.pop_back();
 				}
 
 				Token temp;
-				temp.int_val = result ? 1 : 0;
-				temp.type = Token::Type::BOOL;
+
+				temp.SetBool(result);
 
 				token_stack.push_back(temp);
 			}
@@ -750,8 +962,8 @@ public:
 				token_stack.pop_back();
 
 				Token temp;
-				temp.workspace = space.reader->GetUT();
-				temp.type = Token::Type::WORKSPACE;
+				temp.SetWorkspace(space.reader);
+				
 
 				token_stack.push_back(temp);
 
@@ -760,7 +972,7 @@ public:
 
 			case FUNC::THEN:
 			{
-				auto param = token_stack.back().int_val; // bool
+				auto param = token_stack.back().ToBool(); // bool
 				token_stack.pop_back();
 
 				if (param) {
@@ -800,8 +1012,7 @@ public:
 			{
 				Token token;
 
-				token.type = Token::Type::BOOL;
-				token.int_val = x.return_value_now >= x.return_value.size();
+				token.SetInt(x.return_value_now >= x.return_value.size());
 
 				token_stack.push_back(token);
 			}
@@ -811,17 +1022,17 @@ public:
 				auto a = token_stack.back();
 				token_stack.pop_back();
 
-				a.int_val = a.int_val? 0 : 1;
-				a.type = Token::Type::BOOL;
+				a.SetBool(!a.ToBool());
+
 				token_stack.push_back(a);
 			}
 			break;
 			case FUNC::FUNC_IS_GROUP:
 			{
 				Token token;
-				token.type = Token::Type::BOOL;
+				
+				token.SetBool(token_stack.back().workspace.reader->IsGroup());
 
-				token.int_val = token_stack.back().workspace.reader->IsGroup()? 1 : 0;
 				token_stack.pop_back();
 
 				token_stack.push_back(token);
@@ -830,9 +1041,9 @@ public:
 			case FUNC::FUNC_IS_ITEM:
 			{
 				Token token;
-				token.type = Token::Type::BOOL;
+				
+				token.SetBool(!token_stack.back().workspace.reader->IsGroup());
 
-				token.int_val = !token_stack.back().workspace.reader->IsGroup();
 				token_stack.pop_back();
 
 				token_stack.push_back(token);
@@ -841,9 +1052,7 @@ public:
 			case FUNC::FUNC_GET_SIZE:
 			{
 				Token token;
-				token.type = Token::Type::STRING;
-
-				token.str_val = std::to_string(token_stack.back().workspace.reader->Length());
+				token.SetString(std::to_string(token_stack.back().workspace.reader->Length()));
 				token_stack.pop_back();
 
 				token_stack.push_back(token);
@@ -862,11 +1071,11 @@ public:
 				break;
 
 			case FUNC::FUNC_PRINT:
-				if (token_stack.back().str_val == "\\n") {
+				if (token_stack.back().ToString() == "\\n") {
 					std::cout << "\n";
 				}
 				else {
-					std::cout << token_stack.back().str_val;
+					std::cout << token_stack.back().ToString();
 				}
 				
 				token_stack.pop_back();
@@ -903,8 +1112,7 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 			
 				{
 					Token token(ut);
-					token.type = Token::Type::STRING;
-					token.str_val = ut->GetItemList(it_count).GetName();
+					token.SetString(ut->GetItemList(it_count).GetName());
 
 					e->input->push_back(token);
 				}
@@ -931,8 +1139,7 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 							}
 							else {
 								Token token(ut);
-								token.type = Token::Type::STRING;
-								token.str_val = tokens[i];
+								token.SetString(tokens[i]);
 
 								e->input->push_back(token);
 								e->event_data.push_back(FUNC::CONSTANT); 
@@ -957,8 +1164,7 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 							}
 							else {
 								Token token(ut);
-								token.type = Token::Type::STRING;
-								token.str_val = tokens[i];
+								token.SetString(tokens[i]);
 
 								e->input->push_back(token);
 								e->event_data.push_back(FUNC::CONSTANT); 
@@ -968,8 +1174,8 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 					}
 					else {
 						Token token;
-						token.type = Token::Type::STRING;
-						token.str_val = ut->GetItemList(it_count).Get();
+						
+						token.SetString(ut->GetItemList(it_count).Get());
 
 						e->input->push_back(token);
 
@@ -1053,8 +1259,8 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 							}
 							else {
 								Token token(ut);
-								token.type = Token::Type::STRING;
-								token.str_val = tokens[i];
+								
+								token.SetString(tokens[i]);
 
 								e->input->push_back(token);
 								e->event_data.push_back(FUNC::CONSTANT); 
@@ -1078,8 +1284,8 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 							}
 							else {
 								Token token(ut);
-								token.type = Token::Type::STRING;
-								token.str_val = tokens[i];
+
+								token.SetString(tokens[i]);
 
 								e->input->push_back(token);
 								e->event_data.push_back(FUNC::CONSTANT); 
@@ -1089,8 +1295,8 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 					}
 					else {
 						Token token;
-						token.type = Token::Type::STRING;
-						token.str_val = ut->GetItemList(it_count).Get();
+
+						token.SetString(ut->GetItemList(it_count).Get());
 
 						e->input->push_back(token);
 
@@ -1116,7 +1322,8 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 				if (name._Starts_with("$")) {
 					Token token(ut);
 
-					token.type = Token::Type::FUNC; // | Token::Type::UserType
+					token.SetFunc(); // | Token::Type::UserType
+
 					if (name == "$clone"sv) {
 						token.func = FUNC::FUNC_CLONE;
 
@@ -1187,7 +1394,7 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 					else if (name == "$parameter"sv) {
 						for (int i = 0; i < ut->GetUserTypeList(ut_count)->GetItemListSize(); ++i) {
 							
-							auto name = (*e->input)[e->event_data.back()].str_val;
+							auto name = (*e->input)[e->event_data.back()].ToString();
 							e->event_data.pop_back(); 
 							e->event_data.pop_back();
 							
@@ -1288,10 +1495,9 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 				}
 				else {
 					Token token(ut);
-					token.type = static_cast<Token::Type>(Token::Type::STRING | Token::Type::USERTYPE);
-					token.str_val = std::move(name);
-					token.type = Token::Type::STRING;
-
+					
+					token.SetString(std::move(name));
+					
 					e->input->push_back(token);
 					e->event_data.push_back(FUNC::CONSTANT); 
 					e->event_data.push_back(e->input->size() - 1); 
