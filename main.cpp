@@ -61,7 +61,8 @@ public:
 		//
 	}
 
-	inline std::string ToString() const {
+	const std::string& ToString() const {
+
 		if (type & Type::STRING) {
 			return str_val;
 		}
@@ -78,7 +79,9 @@ public:
 			return str_val;
 		}
 
-		return {};
+		// throw error?
+
+		return str_val;
 	}
 	long long ToInt() const {
 		if (type & Type::INT) {
@@ -320,43 +323,6 @@ struct Event {
 	std::unordered_map<std::string, Token> parameter;
 };
 
-	int tokenize_pre(std::string_view sv, char ch) {
-		int count = 0;
-
-		size_t x;
-		if ((x = sv.find(ch)) == std::string::npos) {
-			if (!sv.empty()) {
-				count++;
-			}
-			return count;
-		}
-
-		if (x > 0) {
-			count++;
-		}
-
-		size_t y;
-		while (x != std::string::npos) {
-			y = sv.find(ch, x + 1);
-
-			if (y == std::string::npos) {
-				if (x + 1 < sv.size()) {
-					count++;
-				}
-				break;
-			}
-			else {
-				if (y - 1 - x + 1 > 0) {
-					count++;
-				}
-			}
-
-			x = y;
-		}
-
-		return count;
-	}
-
 
 class VM {
 private:
@@ -585,7 +551,7 @@ public:
 			case FUNC::DIR:
 				////std::cout << "DIR chk" << token_stack.back().ToString() << "\n";
 			{
-				auto str = token_stack.back().ToString();
+				auto str =token_stack.back().ToString();
 
 				if (str._Starts_with("$parameter.")) {
 					str = str.substr(11);
@@ -594,7 +560,7 @@ public:
 					dir += token.ToString(); // ToString.
 				}
 				else {
-					dir += token_stack.back().ToString(); // ToString
+					dir +=token_stack.back().ToString(); // ToString
 				}
 
 				token_stack.pop_back();
@@ -620,7 +586,7 @@ public:
 			break;
 			case FUNC::FUNC_REMOVE_QUOTED:
 			{
-				auto str = token_stack.back().ToString();
+				auto str =token_stack.back().ToString();
 
 				if (str.size() >= 2) {
 					str = str.substr(1, str.size() - 2);
@@ -635,7 +601,7 @@ public:
 			case FUNC::FUNC_IS_QUOTED_STR:
 			{
 				auto str = token_stack.back().ToString();
-				bool chk = str.size() >= 2 && str[0] == str.back() && str.back() == '\"';
+				bool chk = str.size() >= 2 && (str)[0] == str.back() && str.back() == '\"';
 
 				token_stack.pop_back();
 
@@ -813,7 +779,7 @@ public:
 				break;
 			case FUNC::FUNC_LOAD_DATA:
 			{
-				std::string fileName = token_stack.back().ToString();
+				std::string fileName =token_stack.back().ToString();
 				fileName = fileName.substr(1, fileName.size() - 2);
 				token_stack.pop_back();
 
@@ -836,7 +802,7 @@ public:
 				break;
 			case FUNC::FUNC_SET_NAME:
 			{
-				auto name = token_stack.back().ToString();
+				auto name =token_stack.back().ToString();
 				
 				token_stack.pop_back();
 
@@ -1075,7 +1041,7 @@ public:
 					std::cout << "\n";
 				}
 				else {
-					std::cout << token_stack.back().ToString();
+					std::cout << (token_stack.back().ToString());
 				}
 				
 				token_stack.pop_back();
