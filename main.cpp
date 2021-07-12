@@ -11,6 +11,9 @@
 
 #include "smart_ptr.h"
 
+//#include "ArrayMap.h"
+
+
 using namespace std::literals;
 
 
@@ -322,8 +325,8 @@ struct Event {
 	std::vector<Token> return_value;
 	long long return_value_now;
 	wiz::SmartPtr<std::vector<Token>> input; // ?
-	std::unordered_map<std::string, Token> parameter;
-	std::unordered_map<std::string, Token> local;
+	std::unordered_map<std::string, Token> parameter; // std::unordered_map
+	std::unordered_map<std::string, Token> local; // std::unordered_map
 };
 
 
@@ -543,7 +546,7 @@ public:
 				auto token = token_stack.back();
 				token_stack.pop_back();
 
-				if (token.ToString()._Starts_with("$local.")) {
+				if (token.ToString()._Starts_with("$local."sv)) {
 
 					token_stack.push_back(x.local[token.ToString().substr(7)]);
 				}
@@ -564,10 +567,10 @@ public:
 				auto name = token_stack.back();
 				token_stack.pop_back();
 
-				if (name.ToString()._Starts_with("$local.")) {
+				if (name.ToString()._Starts_with("$local."sv)) {
 					x.local[name.ToString().substr(7)] = value;
 				}
-				else if (name.ToString()._Starts_with("$parameter.")) {
+				else if (name.ToString()._Starts_with("$parameter."sv)) {
 					x.parameter[name.ToString().substr(11)] = value;
 				}
 				else {
@@ -584,13 +587,13 @@ public:
 			{
 				auto str = token_stack.back().ToString();
 
-				if (str._Starts_with("$parameter.")) {
+				if (str._Starts_with("$parameter."sv)) {
 					str = str.substr(11);
 
 					Token token = x.parameter[str];
 					dir += token.ToString();
 				}
-				else if (str._Starts_with("$local.")) {
+				else if (str._Starts_with("$local."sv)) {
 					str = str.substr(7);
 
 					Token token = x.local[str];
@@ -662,7 +665,7 @@ public:
 					//std::cout << value.ToString() << "\n";
 
 					if (value.IsString()) {
-						if (value.ToString()._Starts_with("$parameter.")) {
+						if (value.ToString()._Starts_with("$parameter."sv)) {
 							auto param = value.ToString().substr(11);
 
 							token_stack.push_back(x.parameter[param]);
@@ -1082,14 +1085,28 @@ public:
 				break;
 
 			case FUNC::FUNC_PRINT:
-				if (token_stack.back().ToString() == "\\n") {
-					std::cout << "\n";
-				}
-				else {
-					std::cout << (token_stack.back().ToString());
+			{
+				x.now++;
+
+				std::vector<Token> vec;
+				
+				if (x.event_data[x.now] > 0) {
+					vec.reserve(x.event_data[x.now]);
 				}
 				
-				token_stack.pop_back();
+				for (int i = 0; i < x.event_data[x.now]; ++i) {
+					vec.push_back(token_stack.back());
+					token_stack.pop_back();
+				}
+				for (int i = vec.size() - 1; i >= 0; --i) {
+					if (vec[i].ToString() == "\\n"sv) {
+						std::cout << "\n";
+					}
+					else {
+						std::cout << vec[i].ToString();
+					}
+				}
+			}
 				break;
 			default:
 				//std::cout << "error \n";
@@ -1329,7 +1346,7 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 			_MakeByteCode(ut->GetUserTypeList(ut_count), e);
 
 			if (!ut->GetUserTypeList(ut_count)->GetName().empty()) {
-				if (name._Starts_with("$")) {
+				if (name._Starts_with("$"sv)) {
 					Token token(ut);
 
 					token.SetFunc(); // | Token::Type::UserType
@@ -1391,12 +1408,12 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 
 						e->event_data.push_back(FUNC::FUNC_NEXT);
 					}
-					else if (name == "$enter") {
+					else if (name == "$enter"sv) {
 						token.func = FUNC::FUNC_ENTER;
 
 						e->event_data.push_back(FUNC::FUNC_ENTER);
 					}
-					else if (name == "$quit") {
+					else if (name == "$quit"sv) {
 						token.func = FUNC::FUNC_QUIT;
 
 						e->event_data.push_back(FUNC::FUNC_QUIT);
@@ -1436,18 +1453,18 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 
 						e->event_data.push_back(FUNC::FUNC_COMP_LEFT);
 					}
-					else if (name == "$AND_ALL") {
+					else if (name == "$AND_ALL"sv) {
 						token.func = FUNC::FUNC_AND_ALL;
 
 						e->event_data.push_back(FUNC::FUNC_AND_ALL);
 						e->event_data.push_back(ut->GetUserTypeList(ut_count)->GetIListSize());
 					}
-					else if (name == "$AND") {
+					else if (name == "$AND"sv) {
 						token.func = FUNC::FUNC_AND;
 
 						e->event_data.push_back(FUNC::FUNC_AND);
 					}
-					else if (name == "$OR") {
+					else if (name == "$OR"sv) {
 						token.func = FUNC::FUNC_OR;
 
 						e->event_data.push_back(FUNC::FUNC_OR);
@@ -1462,7 +1479,7 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 
 						e->event_data.push_back(FUNC::FUNC_GET_IDX);
 					}
-					else if (name == "$return") {
+					else if (name == "$return"sv) {
 						token.func = FUNC::FUNC_RETURN;
 
 						e->event_data.push_back(FUNC::FUNC_RETURN);
@@ -1477,7 +1494,7 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 
 						e->event_data.push_back(FUNC::FUNC_SET_NAME); 
 					}
-					else if (name == "$get_value") {
+					else if (name == "$get_value"sv) {
 						token.func = FUNC::FUNC_GET_VALUE;
 
 						e->event_data.push_back(FUNC::FUNC_GET_VALUE); 
@@ -1517,6 +1534,7 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 						token.func = FUNC::FUNC_PRINT;
 
 						e->event_data.push_back(FUNC::FUNC_PRINT); 
+						e->event_data.push_back(ut->GetUserTypeList(ut_count)->GetIListSize());
 					}
 
 					// todo - add processing. errors..
@@ -1524,7 +1542,7 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 					e->input->push_back(token);
 				}
 				else {
-					Token token(ut);
+					Token token;
 					
 					token.SetString(std::move(name));
 					

@@ -3,6 +3,11 @@
 
 # ToDo - end of function.?  $find = { @eu4 } FUNC_FIND DIR_START DIR END_DIR (END_FUNC?)
 
+# DONE - Print, number of param.
+# ToDo - Query..
+
+# DONE - $local.
+
 # DONE - TRUE FALSE
 
 # DONE - $get = { /./test } #"eu4"
@@ -25,9 +30,7 @@ Event = { id = main
 	
 	$print = { @/"test"/"test"@$get }
 	
-	$print = { \n } 
-	$print = { @1@2@$add@4@$add }
-	$print = { \n } 
+	$print = { \n @1@2@$add@4@$add \n }
 	
 	# load data from file.
 	
@@ -116,9 +119,7 @@ Event = { id = test
 		#@$parameter.value@$print
 		##@\n@$print
 		
-		#$print = { : }
-		#$print = { $parameter.value } 
-		#$print = { \n }
+		#$print = { : $parameter.value \n }
 		
 		$set_value = { @$parameter.iter $parameter.value }
 	}
@@ -136,9 +137,7 @@ Event = { id = test
 		#@$parameter.value@$print
 		#@\n@$print
 		
-		#$print = { : }
-		#$print = { $parameter.value } 
-		#$print = { \n }
+		#$print = { : $parameter.value \n }
 		
 		$set_value = { @$parameter.iter $remove_quoted = { $parameter.value } }
 	}
