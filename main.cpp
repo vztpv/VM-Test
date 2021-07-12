@@ -15,7 +15,7 @@ using namespace std::literals;
 
 
 
-enum FUNC { TRUE = 0, FALSE, FUNC_GET, FUNC_FIND, FUNC_WHILE, FUNC_RETURN_VALUE, FUNC_IS_END, FUNC_NOT,
+enum FUNC { TRUE = 0, FALSE, FUNC_ASSIGN, FUNC_GET, FUNC_FIND, FUNC_WHILE, FUNC_RETURN_VALUE, FUNC_IS_END, FUNC_NOT,
 	FUNC_LOAD_DATA, FUNC_ENTER, FUNC_CALL, FUNC_NEXT, FUNC_RETURN, FUNC_COMP_RIGHT,
 	FUNC_ADD, FUNC_GET_IDX, FUNC_GET_SIZE, FUNC_GET_NOW, FUNC_CLONE, FUNC_QUIT, FUNC_IF, FUNC_IS_ITEM,
 	FUNC_IS_GROUP, FUNC_SET_IDX, FUNC_AND_ALL, FUNC_AND, FUNC_OR, FUNC_IS_QUOTED_STR, FUNC_COMP_LEFT, FUNC_SET_NAME, FUNC_GET_NAME, FUNC_GET_VALUE,
@@ -23,7 +23,8 @@ enum FUNC { TRUE = 0, FALSE, FUNC_GET, FUNC_FIND, FUNC_WHILE, FUNC_RETURN_VALUE,
 	KEY, VALUE,  SIZE // chk?
   };
 const char* func_to_str[FUNC::SIZE] = {
-	"TRUE", "FALSE",
+	"TRUE", "FALSE", 
+	"ASSIGN",
 	"GET",
 	"FIND", "WHILE", "RETURN_VALUE", "IS_END", "NOT", "LOAD_DATA", "ENTER", "CALL", "NEXT", "RETURN", "COMP_RIGHT",
 	"ADD", "GET_IDX", "GET_SIZE", "GET_NOW", "CLONE", "QUIT", "IF", "IS_ITEM",
@@ -54,9 +55,10 @@ private:
 	mutable Type type = Type::NONE;
 
 public:
+	clau_parser::UserType* ut_val = nullptr;
 	Workspace workspace;
 	long long line = 0;
-
+	
 	Token(clau_parser::UserType* ut = nullptr) : workspace(ut) {
 		//
 	}
@@ -321,6 +323,7 @@ struct Event {
 	long long return_value_now;
 	wiz::SmartPtr<std::vector<Token>> input; // ?
 	std::unordered_map<std::string, Token> parameter;
+	std::unordered_map<std::string, Token> local;
 };
 
 
@@ -505,6 +508,7 @@ public:
 	void Run(const std::string& id, clau_parser::UserType* global) {
 		Event main = _event_list[id];
 		std::vector<Token> token_stack;
+		std::vector<Event> _stack;
 
 		_stack.push_back(main);
 		int count = 0;
@@ -544,6 +548,25 @@ public:
 				token_stack.push_back(value[0]);
 			}
 			break;
+			case FUNC::FUNC_ASSIGN:
+			{
+				auto value = token_stack.back();
+				token_stack.pop_back();
+
+				auto name = token_stack.back();
+				token_stack.pop_back();
+
+				if (name.ToString()._Starts_with("$local.")) {
+					_stack.back().local[name.ToString().substr(7)] = value;
+				}
+				else if (name.ToString()._Starts_with("$parameter.")) {
+					_stack.back().parameter[name.ToString().substr(11)] = value;
+				}
+				else {
+					// todo
+				}
+			}
+			break;
 			case FUNC::START_DIR:
 				count = 0;
 				dir = "/";
@@ -551,13 +574,19 @@ public:
 			case FUNC::DIR:
 				////std::cout << "DIR chk" << token_stack.back().ToString() << "\n";
 			{
-				auto str =token_stack.back().ToString();
+				auto str = token_stack.back().ToString();
 
 				if (str._Starts_with("$parameter.")) {
 					str = str.substr(11);
 
 					Token token = x.parameter[str];
-					dir += token.ToString(); // ToString.
+					dir += token.ToString();
+				}
+				else if (str._Starts_with("$local.")) {
+					str = str.substr(7);
+
+					Token token = x.local[str];
+					dir += token.ToString();
 				}
 				else {
 					dir +=token_stack.back().ToString(); // ToString
@@ -632,6 +661,14 @@ public:
 							x.now++;
 							continue;
 						}
+						else if (value.ToString()._Starts_with("$local.")) {
+							auto name = value.ToString().substr(7);
+
+							token_stack.push_back(x.local[name]);
+
+							x.now++;
+							continue;
+						}
 					}
 
 					{ 
@@ -690,13 +727,20 @@ public:
 							break;
 						}
 						else if (value.IsString()) {
-							if (value.ToString()._Starts_with("/$parameter.")) {
-								value = x.parameter[value.ToString().substr(11)];
+							//if (value.ToString()._Starts_with("$parameter.")) {
+							//	value = x.parameter[value.ToString().substr(11)];
 
-								if (value.ToString()._Starts_with("$return_value")) {
-									value = x.return_value[x.return_value_now];
-								}
-							}
+							//	if (value.ToString()._Starts_with("$return_value")) {
+							//		value = x.return_value[x.return_value_now];
+							//	}
+						//	}
+							//else if (value.ToString()._Starts_with("$local.")) {
+							//	value = x.parameter[value.ToString().substr(7)];
+
+								//	if (value.ToString()._Starts_with("$return_value")) {
+								//		value = x.return_value[x.return_value_now];
+								//	}
+							//}
 						}
 
 						e.parameter[name.ToString()] = std::move(value); // name.ToString()
@@ -1061,7 +1105,6 @@ public:
 
 private:
 	std::unordered_map<std::string, Event> _event_list;
-	std::vector<Event> _stack;
 };
 
 
@@ -1096,7 +1139,7 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 						auto tokens = clau_parser::tokenize(a, '/');
 
 						for (int i = 0; i < tokens.size(); ++i) {
-							if (tokens[i]._Starts_with("$"sv) && !tokens[i]._Starts_with("$parameter."sv)) {
+							if (tokens[i]._Starts_with("$"sv) && !tokens[i]._Starts_with("$parameter."sv) && !tokens[i]._Starts_with("$local."sv)) {
 								clau_parser::UserType new_ut;
 
 								new_ut.AddUserTypeItem(clau_parser::UserType(tokens[i]));
@@ -1120,7 +1163,7 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 						auto tokens = clau_parser::tokenize(a, '@');
 
 						for (int i = 0; i < tokens.size(); ++i) {
-							if (tokens[i]._Starts_with("$"sv) && !tokens[i]._Starts_with("$parameter."sv)) {
+							if (tokens[i]._Starts_with("$"sv) && !tokens[i]._Starts_with("$parameter."sv) && !tokens[i]._Starts_with("$local."sv)) {
 								clau_parser::UserType new_ut;
 
 								new_ut.AddUserTypeItem(clau_parser::UserType(tokens[i]));
@@ -1215,7 +1258,7 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 						auto tokens = clau_parser::tokenize(a, '/');
 
 						for (int i = 0; i < tokens.size(); ++i) {
-							if (tokens[i]._Starts_with("$"sv) && !tokens[i]._Starts_with("$parameter."sv)) {
+							if (tokens[i]._Starts_with("$"sv) && !tokens[i]._Starts_with("$parameter."sv) && !tokens[i]._Starts_with("$local."sv)) {
 								clau_parser::UserType new_ut;
 
 								new_ut.AddUserTypeItem(clau_parser::UserType(tokens[i]));
@@ -1241,7 +1284,7 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 						auto tokens = clau_parser::tokenize(a, '@');
 
 						for (int i = 0; i < tokens.size(); ++i) {
-							if (tokens[i]._Starts_with("$"sv) && !tokens[i]._Starts_with("$parameter."sv)) {
+							if (tokens[i]._Starts_with("$"sv) && !tokens[i]._Starts_with("$parameter."sv) && !tokens[i]._Starts_with("$local."sv)) {
 								clau_parser::UserType new_ut;
 
 								new_ut.AddUserTypeItem(clau_parser::UserType(tokens[i]));
@@ -1249,7 +1292,7 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 								_MakeByteCode(&new_ut, e);
 							}
 							else {
-								Token token(ut);
+								Token token;
 
 								token.SetString(tokens[i]);
 
@@ -1293,115 +1336,132 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 					if (name == "$clone"sv) {
 						token.func = FUNC::FUNC_CLONE;
 
-						e->event_data.push_back(FUNC::FUNC_CLONE); 
+						e->event_data.push_back(FUNC::FUNC_CLONE);
 					}
 					else if (name == "$call"sv) {
 						token.func = FUNC::FUNC_CALL;
 
-						e->event_data.push_back(FUNC::FUNC_CALL); 
-						e->event_data.push_back(ut->GetUserTypeList(ut_count)->GetItemListSize()); 
+						e->event_data.push_back(FUNC::FUNC_CALL);
+						e->event_data.push_back(ut->GetUserTypeList(ut_count)->GetItemListSize());
 
 					}
 					else if (name == "$set_idx"sv) {
 						token.func = FUNC::FUNC_SET_IDX;
-						
-						e->event_data.push_back(FUNC::FUNC_SET_IDX); 
+
+						e->event_data.push_back(FUNC::FUNC_SET_IDX);
 					}
 					else if (name == "$add"sv) {
 						token.func = FUNC::FUNC_ADD;
 
-						e->event_data.push_back(FUNC::FUNC_ADD); 
+						e->event_data.push_back(FUNC::FUNC_ADD);
 					}
 					else if (name == "$get"sv) {
 						token.func = FUNC::FUNC_GET;
-						
-						e->event_data.push_back(FUNC::FUNC_GET); 
+
+						e->event_data.push_back(FUNC::FUNC_GET);
 					}
 					else if (name == "$get_name"sv) {
 						token.func = FUNC::FUNC_GET_NAME;
 
-						e->event_data.push_back(FUNC::FUNC_GET_NAME); 
+						e->event_data.push_back(FUNC::FUNC_GET_NAME);
 					}
 					else if (name == "$find"sv) {
 						token.func = FUNC::FUNC_FIND;
 
-						e->event_data.push_back(FUNC::FUNC_FIND); 
+						e->event_data.push_back(FUNC::FUNC_FIND);
 					}
 					else if (name == "$NOT"sv) {
 						token.func = FUNC::FUNC_NOT;
 
-						e->event_data.push_back(FUNC::FUNC_NOT); 
+						e->event_data.push_back(FUNC::FUNC_NOT);
 					}
 					else if (name == "$is_end"sv) {
 						token.func = FUNC::FUNC_IS_END;
 
-						e->event_data.push_back(FUNC::FUNC_IS_END); 
+						e->event_data.push_back(FUNC::FUNC_IS_END);
 					}
 					else if (name == "$load_data"sv) {
 						token.func = FUNC::FUNC_LOAD_DATA;
 
-						e->event_data.push_back(FUNC::FUNC_LOAD_DATA); 
+						e->event_data.push_back(FUNC::FUNC_LOAD_DATA);
 					}
 					else if (name == "$next"sv) {
 						token.func = FUNC::FUNC_NEXT;
 
-						e->event_data.push_back(FUNC::FUNC_NEXT); 
+						e->event_data.push_back(FUNC::FUNC_NEXT);
 					}
 					else if (name == "$enter") {
 						token.func = FUNC::FUNC_ENTER;
 
-						e->event_data.push_back(FUNC::FUNC_ENTER); 
+						e->event_data.push_back(FUNC::FUNC_ENTER);
 					}
 					else if (name == "$quit") {
 						token.func = FUNC::FUNC_QUIT;
 
-						e->event_data.push_back(FUNC::FUNC_QUIT); 
+						e->event_data.push_back(FUNC::FUNC_QUIT);
 					}
 					else if (name == "$parameter"sv) {
 						for (int i = 0; i < ut->GetUserTypeList(ut_count)->GetItemListSize(); ++i) {
-							
+
 							auto name = (*e->input)[e->event_data.back()].ToString();
-							e->event_data.pop_back(); 
 							e->event_data.pop_back();
-							
+
 							e->parameter[name] = Token();
 						}
+					}
+					else if (name == "$local"sv) {
+						for (int i = 0; i < ut->GetUserTypeList(ut_count)->GetItemListSize(); ++i) {
+
+							auto name = (*e->input)[e->event_data.back()].ToString();
+							e->event_data.pop_back();
+
+							e->local[name] = Token();
+						}
+					}
+					else if (name == "$assign"sv) {
+						token.func = FUNC::FUNC_ASSIGN;
+
+						e->event_data.push_back(FUNC::FUNC_ASSIGN);
 					}
 					else if (name == "$COMP<"sv) {
 						token.func = FUNC::FUNC_COMP_RIGHT;
 
-						e->event_data.push_back(FUNC::FUNC_COMP_RIGHT); 
+						e->event_data.push_back(FUNC::FUNC_COMP_RIGHT);
 					}
 					else if (name == "$COMP>"sv) {
 						token.func = FUNC::FUNC_COMP_LEFT;
 
-						e->event_data.push_back(FUNC::FUNC_COMP_LEFT); 
+						e->event_data.push_back(FUNC::FUNC_COMP_LEFT);
 					}
 					else if (name == "$AND_ALL") {
 						token.func = FUNC::FUNC_AND_ALL;
 
-						e->event_data.push_back(FUNC::FUNC_AND_ALL); 
-						e->event_data.push_back(ut->GetUserTypeList(ut_count)->GetIListSize()); 
+						e->event_data.push_back(FUNC::FUNC_AND_ALL);
+						e->event_data.push_back(ut->GetUserTypeList(ut_count)->GetIListSize());
 					}
 					else if (name == "$AND") {
 						token.func = FUNC::FUNC_AND;
 
-						e->event_data.push_back(FUNC::FUNC_AND); 
+						e->event_data.push_back(FUNC::FUNC_AND);
 					}
 					else if (name == "$OR") {
 						token.func = FUNC::FUNC_OR;
 
-						e->event_data.push_back(FUNC::FUNC_OR); 
+						e->event_data.push_back(FUNC::FUNC_OR);
 					}
 					else if (name == "$get_size"sv) {
 						token.func = FUNC::FUNC_GET_SIZE;
 
-						e->event_data.push_back(FUNC::FUNC_GET_SIZE); 
+						e->event_data.push_back(FUNC::FUNC_GET_SIZE);
 					}
 					else if (name == "$get_idx"sv) {
 						token.func = FUNC::FUNC_GET_IDX;
 
-						e->event_data.push_back(FUNC::FUNC_GET_IDX); 
+						e->event_data.push_back(FUNC::FUNC_GET_IDX);
+					}
+					else if (name == "$return") {
+						token.func = FUNC::FUNC_RETURN;
+						e->event_data.push_back(FUNC::FUNC_RETURN);
 					}
 					else if (name == "$return_value"sv) {
 						token.func = FUNC::FUNC_RETURN_VALUE;
