@@ -21,25 +21,26 @@ Test = {
 
 Event = { id = main
 	
-	$print = { @/"test"/"test"@$get }	
+	$local = { x }
+	
+	$print = { @/"test"/"test"@$get }
+	
 	$print = { \n } 
 	$print = { @1@2@$add@4@$add }
 	$print = { \n } 
 	
 	# load data from file.
+	
 	#$find = { /Test/eu4 }  
 	
-	@/Test/eu4/@$find 
+	@/Test/eu4/@$find
 	
-	# $set_option = { CALL_NO_RETURN }
-	$load_data = { $return_value = { } "C:\Users\vztpv\Desktop\Clau\ClauParser\ClauParser\input.eu4" }
+	$assign = { $local.x $return_value = { } }
 	
-	# chk return_value.. no return?
+	$load_data = { @$local.x@$get "C:\Users\vztpv\Desktop\Clau\ClauParser\ClauParser\input.eu4" }
 	
 	# call
-	$call = { id = iterate workspace = @$return_value@$clone  event = test } # @$return_value ??
-
-	# $set_option = { CALL_RETURN }
+	$call = { id = iterate workspace = @$local.x@$get@$clone  event = test } # @$return_value ??
 }
 
 Event = { id = iterate

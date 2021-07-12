@@ -520,7 +520,7 @@ public:
 			count++;
 
 			//std::cout << func_to_str[x.event_data[x.now]] << "\n";
-
+			
 			switch (x.event_data[x.now]) {
 			case FUNC::TRUE:
 			{
@@ -543,10 +543,18 @@ public:
 				auto token = token_stack.back();
 				token_stack.pop_back();
 
-				auto value = FindValue(global, token.ToString()); // ToString?
+				if (token.ToString()._Starts_with("$local.")) {
 
-				token_stack.push_back(value[0]);
+					token_stack.push_back(x.local[token.ToString().substr(7)]);
+				}
+				
+				else {
+					auto value = FindValue(global, token.ToString()); // ToString?
+
+					token_stack.push_back(value[0]);
+				}
 			}
+
 			break;
 			case FUNC::FUNC_ASSIGN:
 			{
@@ -557,10 +565,10 @@ public:
 				token_stack.pop_back();
 
 				if (name.ToString()._Starts_with("$local.")) {
-					_stack.back().local[name.ToString().substr(7)] = value;
+					x.local[name.ToString().substr(7)] = value;
 				}
 				else if (name.ToString()._Starts_with("$parameter.")) {
-					_stack.back().parameter[name.ToString().substr(11)] = value;
+					x.parameter[name.ToString().substr(11)] = value;
 				}
 				else {
 					// todo
@@ -589,7 +597,7 @@ public:
 					dir += token.ToString();
 				}
 				else {
-					dir +=token_stack.back().ToString(); // ToString
+					dir += token_stack.back().ToString(); // ToString
 				}
 
 				token_stack.pop_back();
@@ -651,20 +659,13 @@ public:
 
 				{
 					const auto& value = (*x.input)[x.event_data[x.now]];
+					//std::cout << value.ToString() << "\n";
 
 					if (value.IsString()) {
 						if (value.ToString()._Starts_with("$parameter.")) {
 							auto param = value.ToString().substr(11);
 
 							token_stack.push_back(x.parameter[param]);
-
-							x.now++;
-							continue;
-						}
-						else if (value.ToString()._Starts_with("$local.")) {
-							auto name = value.ToString().substr(7);
-
-							token_stack.push_back(x.local[name]);
 
 							x.now++;
 							continue;
@@ -845,8 +846,8 @@ public:
 				token_stack.pop_back();
 				break;
 			case FUNC::FUNC_SET_NAME:
-			{
-				auto name =token_stack.back().ToString();
+			{ 
+				auto name = token_stack.back().ToString();
 				
 				token_stack.pop_back();
 
@@ -1404,7 +1405,8 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 						for (int i = 0; i < ut->GetUserTypeList(ut_count)->GetItemListSize(); ++i) {
 
 							auto name = (*e->input)[e->event_data.back()].ToString();
-							e->event_data.pop_back();
+							e->event_data.pop_back(); // name
+							e->event_data.pop_back(); // CONSTATNT
 
 							e->parameter[name] = Token();
 						}
@@ -1413,7 +1415,8 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 						for (int i = 0; i < ut->GetUserTypeList(ut_count)->GetItemListSize(); ++i) {
 
 							auto name = (*e->input)[e->event_data.back()].ToString();
-							e->event_data.pop_back();
+							e->event_data.pop_back(); // name
+							e->event_data.pop_back(); // CONSTANT
 
 							e->local[name] = Token();
 						}
@@ -1461,6 +1464,7 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 					}
 					else if (name == "$return") {
 						token.func = FUNC::FUNC_RETURN;
+
 						e->event_data.push_back(FUNC::FUNC_RETURN);
 					}
 					else if (name == "$return_value"sv) {
