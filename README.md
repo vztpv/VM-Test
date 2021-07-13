@@ -41,7 +41,7 @@
     # ToDo - end of function.?  $find = { @eu4 } FUNC_FIND DIR_START DIR END_DIR (END_FUNC?)
 
     # DONE - Print, number of param.
-    # ToDo - Query..
+    # DONE - Query..
 
     # DONE - $local.
 
