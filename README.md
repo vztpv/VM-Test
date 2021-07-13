@@ -35,14 +35,25 @@
        # make_var_int, get_var_int, set_var_int <- var_id?
 
 
+
 # ClauScript++ Example...
 
     # ToDo - end of function.?  $find = { @eu4 } FUNC_FIND DIR_START DIR END_DIR (END_FUNC?)
-    # ToDo - $get = { /./test } #"eu4"
-    # ToDo - @/./test@$get
-    # Done - @eu4@$find  # <- now ok.
 
-    test = "eu4"
+    # DONE - Print, number of param.
+    # ToDo - Query..
+
+    # DONE - $local.
+
+    # DONE - TRUE FALSE
+
+    # DONE - $get = { /./test } #"eu4"
+    # DONE - @/./test@$get
+    # DONE - @eu4@$find  # <- now ok.
+
+    # DONE - abc"ddd" # number of scanning thread = 1
+
+    "test" = { "test" = "eu4" }
 
     Test = {
         eu4 = {
@@ -50,33 +61,96 @@
         }
     }
 
-    Event = {
-        id = main
-
-    	$print = { @/./test@$get }
-        $print = { @1@2@$add@4@$add }
-        $print = { \n } 
-
-        # load data from file.
-        #$find = { /Test/eu4 }  
-
-        @/Test/eu4@$find 
-
-        $load_data = { $return_value = { } "C:\Users\vztpv\Desktop\Clau\ClauParser\ClauParser\input.eu4" }
-
-        $call = { id = iterate workspace = @$return_value@$clone  event = test } # @$return_value ??
-
-        # @a@$func <- no ok.
-        # $func2 = { @a@$func } # <- ok.
+    data = {
 
     }
 
-    Event = {
-        id = iterate
+    Event = { id = test2 
+        $print = { @/./x@$get \ns }
+        $return = { 1 }
+    }
+
+    Event = { id = main
+
+        $local = { x }
+
+        $print = { @/"test"/"test"@$get }
+
+        $print = { \n @1@2@$add@4@$add \n }
+
+        # load data from file.
+
+        #$find = { /Test/eu4 }  
+
+        @/Test/eu4/@$find
+
+        $assign = { $local.x $return_value = { } }
+
+        $load_data = { @$local.x@$get "C:\Users\vztpv\Desktop\Clau\ClauParser\ClauParser\input.eu4" }
+
+        ## call
+        $call = { id = iterate workspace = @$local.x@$get@$clone  event = test } # @$return_value ??
+
+        $query = {
+            workspace = { /data }
+            $insert = {
+                @x = 15
+                @y = {
+                    z = 0
+                } 
+                @"a" = 3
+
+                @provinces = {
+                    -1 = {
+                        x = 0
+                    }
+                    -2 = {
+                        x = 1
+                    }
+                }
+            }
+            $insert = {
+                x = 15
+
+                provinces = {
+                    $ = {
+                        x = 0
+                        @y = wow2
+                    }
+                }
+            }
+            $update = {
+                #@x = 2 # @ : target, 2 : set value
+                "a" = 3 # condition
+                y = {
+                    @z = 4 # @ : target.
+                }
+                provinces = {
+                    $ = {
+                        x = 0
+                        @y = %event_test2 # %event_test2%'x = /./x' <- support?
+                    }
+                }
+            }
+
+            #$delete = {
+            #	@x = 1 # @ : remove object., if value is 1 then remove
+            #	"a" = 3 # condition.
+            #	y = {
+            #		@z = %any # %any : condition - always.
+            #	}
+            #	provinces = {
+            #		@$ = { # $ : all usertype( array or object or mixed )
+            #			x = 1 # condition.
+            #		}
+            #	}
+            #}
+        }
+    }
+
+    Event = { id = iterate
 
         $parameter = { workspace event } # recursive?
-
-        # $ <- 데이터영역?에서 $로 시작하지않는다. - 조건?
 
         $set_idx = { @$parameter.workspace 0 }
 
@@ -98,15 +172,15 @@
         }
     }
 
-    Event = {
-        id = test
+    Event = { id = test
 
         $parameter = { iter name value is_user_type }	
 
         $if { 
-                $AND = { 
+                $AND_ALL = { 
                     $NOT = { $is_quoted_str = { $parameter.name } }			
-                    $NOT = { $is_quoted_str = { $parameter.name } }			
+                    TRUE
+                    TRUE				
                     # $COMP> = { $parameter.name 1444 }
                 }
             } {
@@ -118,9 +192,9 @@
             $set_name = { @$parameter.iter $parameter.name }
         }
         $if { 
-                $AND = { 
+                $AND_ALL = { 
                     $is_quoted_str = { $parameter.name }
-                    $is_quoted_str = { $parameter.name }
+                    TRUE
 
                     #$COMP> = { $remove_quoted = { $parameter.name } 1444 }
                 }
@@ -134,9 +208,9 @@
         }
 
         $if { 
-                $AND = {
+                $AND_ALL = {
                     $NOT = { $parameter.is_user_type }
-                    #$AND_ALL = {#
+                    #$AND = {#
                         $NOT = { $is_quoted_str = { $parameter.value } }
                         #$COMP> = {  $parameter.value 1444 }
                     #}
@@ -145,18 +219,16 @@
 
             #@:@$print
             #@$parameter.value@$print
-            #@\n@$print
+            ##@\n@$print
 
-            #$print = { : }
-            #$print = { $parameter.value } 
-            #$print = { \n }
+            #$print = { : $parameter.value \n }
 
             $set_value = { @$parameter.iter $parameter.value }
         }
         $if { 
-                $AND = { 
+                $AND_ALL = { 
                     $NOT = { $parameter.is_user_type }
-                    #$AND_ALL = { 
+                    #$AND = { 
                         $is_quoted_str = { $parameter.value }
                         #$COMP> = { $remove_quoted = { $parameter.value } 1444 }
                     #}
@@ -167,9 +239,7 @@
             #@$parameter.value@$print
             #@\n@$print
 
-            #$print = { : }
-            #$print = { $parameter.value } 
-            #$print = { \n }
+            #$print = { : $parameter.value \n }
 
             $set_value = { @$parameter.iter $remove_quoted = { $parameter.value } }
         }
