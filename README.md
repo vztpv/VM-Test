@@ -66,7 +66,7 @@
     }
 
     Event = { id = test2 
-        $print = { @/./x@$get \ns }
+        $print = { @/./x@$get \n }
         $return = { 1 }
     }
 
