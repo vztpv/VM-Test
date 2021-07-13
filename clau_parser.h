@@ -1460,6 +1460,61 @@ namespace clau_parser {
 		}
 
 	public:
+		std::vector<long long> GetUserTypeItemIdx(const std::string& name) const { /// chk...
+			std::vector<long long> temp;
+
+			for (int i = 0; i < userTypeList.size(); ++i) {
+				if (userTypeList[i]->GetName() == name) {
+					temp.push_back(i);
+				}
+			}
+
+			return temp;
+		}
+
+		bool RemoveItemList(const std::string& _varName, const std::string& valName)
+		{
+			std::string varName = _varName;
+
+			if (varName._Starts_with("&"sv) && varName.size() >= 2) {
+				long long idx = std::stoll(varName.substr(1));
+
+				if (idx < 0 || idx >= itemList.size()) {
+					return false;
+				}
+
+				if (itemList[idx].Get() == valName || valName == "%any"sv) {
+					RemoveItemList(idx);
+				}
+
+				return true;
+			}
+
+			bool err = false;
+			int k = _GetIndex(ilist, 1, err, 0);
+			std::vector<ItemType<std::string>> tempDic;
+			for (int i = 0; i < itemList.size(); ++i) {
+				if (!(varName == itemList[i].GetName() && (valName == "%any"sv || valName == itemList[i].Get()))) {
+					tempDic.push_back(itemList[i]);
+					k = _GetIndex(ilist, 1, err, k + 1);
+				}
+				else {
+					// remove item, ilist left shift 1.
+					for (int j = k + 1; j < ilist.size(); ++j) {
+						ilist[j - 1] = ilist[j];
+					}
+					ilist.resize(ilist.size() - 1);
+					k = _GetIndex(ilist, 1, err, k);
+				}
+			}
+			itemList = std::move(tempDic);
+
+			useSortedItemList = false;
+
+			changed = true;
+			return true;
+		}
+
 		size_t GetItemListCapacity() const { return itemList.capacity(); }
 		size_t GetIListSize()const { return ilist.size(); }
 		size_t GetItemListSize()const { return itemList.size(); }

@@ -5,6 +5,7 @@
 #include <iostream>
 #include <regex>
 #include <map>
+#include <queue>
 #include <unordered_map>
 
 #include "clau_parser.h"
@@ -18,7 +19,7 @@ using namespace std::literals;
 
 
 
-enum FUNC { TRUE = 0, FALSE, FUNC_ASSIGN, FUNC_GET, FUNC_FIND, FUNC_WHILE, FUNC_RETURN_VALUE, FUNC_IS_END, FUNC_NOT,
+enum FUNC { TRUE = 0, FALSE, FUNC_QUERY, FUNC_ASSIGN, FUNC_GET, FUNC_FIND, FUNC_WHILE, FUNC_RETURN_VALUE, FUNC_IS_END, FUNC_NOT,
 	FUNC_LOAD_DATA, FUNC_ENTER, FUNC_CALL, FUNC_NEXT, FUNC_RETURN, FUNC_COMP_RIGHT,
 	FUNC_ADD, FUNC_GET_IDX, FUNC_GET_SIZE, FUNC_GET_NOW, FUNC_CLONE, FUNC_QUIT, FUNC_IF, FUNC_IS_ITEM,
 	FUNC_IS_GROUP, FUNC_SET_IDX, FUNC_AND_ALL, FUNC_AND, FUNC_OR, FUNC_IS_QUOTED_STR, FUNC_COMP_LEFT, FUNC_SET_NAME, FUNC_GET_NAME, FUNC_GET_VALUE,
@@ -26,7 +27,7 @@ enum FUNC { TRUE = 0, FALSE, FUNC_ASSIGN, FUNC_GET, FUNC_FIND, FUNC_WHILE, FUNC_
 	KEY, VALUE,  SIZE // chk?
   };
 const char* func_to_str[FUNC::SIZE] = {
-	"TRUE", "FALSE", 
+	"TRUE", "FALSE", "QUERY",
 	"ASSIGN",
 	"GET",
 	"FIND", "WHILE", "RETURN_VALUE", "IS_END", "NOT", "LOAD_DATA", "ENTER", "CALL", "NEXT", "RETURN", "COMP_RIGHT",
@@ -58,7 +59,7 @@ private:
 	mutable Type type = Type::NONE;
 
 public:
-	clau_parser::UserType* ut_val = nullptr;
+	wiz::SmartPtr<clau_parser::UserType> ut_val = nullptr;
 	Workspace workspace;
 	long long line = 0;
 	
@@ -332,7 +333,845 @@ struct Event {
 
 class VM {
 private:
+	class UtInfo {
+	public:
+		clau_parser::UserType* global;
+		clau_parser::UserType* ut;
+		std::string dir;
+		long long itCount = 0;
+		long long utCount = 0;
+		long long count = 0;
+	public:
+		UtInfo(clau_parser::UserType* global, clau_parser::UserType* ut, const std::string& dir, long long itCount = 0, long long utCount = 0)
+			: global(global), ut(ut), itCount(itCount), utCount(utCount), count(0), dir(dir)
+		{
+			//
+		}
+	};
 
+	// for $insert, $update, $delete
+	inline bool EqualFunc(clau_parser::UserType* global, const clau_parser::ItemType<std::string>& x,
+		clau_parser::ItemType<std::string> y, long long x_idx, const std::string& dir, VM* vm) {
+
+		auto x_name = x.GetName();
+		auto x_value = x.Get();
+
+		bool use_not = false;
+		if (y.Get()._Starts_with("!"sv)) {
+			use_not = true;
+			y.Set(0, y.Get().substr(1));
+		}
+
+		{
+			std::string name = y.GetName();
+
+			if (name._Starts_with("&"sv) && name.size() >= 2) {
+				long long idx = std::stoll(name.substr(1));
+				if (idx < 0 || idx >= global->GetItemListSize()) {
+					return false;
+				}
+
+				if (y.Get() == "%any"sv) {
+					return !use_not;
+				}
+
+				x_idx = idx;
+				x_name = global->GetItemList(idx).GetName();
+				x_value = global->GetItemList(idx).Get();
+			}
+		}
+
+		if (y.Get() == "%any"sv) {
+			return !use_not;
+		}
+
+		if (y.Get()._Starts_with("%event_"sv)) {
+			std::string event_id = y.Get().substr(7);
+
+			std::unordered_map<std::string, Token> param;
+
+			Token token;
+			token.SetString(x_name.empty() ? "EMPTY_NAME" : x_name);
+			param["name"] = token; 
+			token.SetString(x_value);
+			param["value"] = token;
+			token.SetBool(false);
+			param["is_user_type"] = token;
+
+			std::string result = vm->Run(event_id, global, param)[0].ToString();
+
+			bool success = false;
+			if (result == "TRUE"sv) {
+				success = true;
+			}
+
+			if (use_not) {
+				return !success;
+			}
+			return success;
+		}
+
+		if (use_not) {
+			return x_value != y.Get();
+		}
+		return x_value == y.Get();
+	}
+
+
+	bool _InsertFunc(clau_parser::UserType* global, clau_parser::UserType* insert_ut, VM* vm) {
+		std::queue<UtInfo> que;
+
+		std::string dir = "/.";
+
+		que.push(UtInfo(global, insert_ut, dir));
+
+		while (!que.empty()) {
+			UtInfo x = que.front();
+			que.pop();
+
+			// find non-@
+			long long ut_count = 0;
+			long long it_count = 0;
+			long long count = 0;
+
+			for (long long i = 0; i < x.ut->GetIListSize(); ++i) {
+				if (x.ut->IsItemList(i) && x.ut->GetItemList(it_count).GetName().empty()
+					&& !x.ut->GetItemList(it_count).Get()._Starts_with("@"sv)) {
+					// chk exist all case of value?
+					auto item = x.global->GetItemIdx("");
+					// no exist -> return false;
+					if (item.empty()) {
+						// LOG....
+						return false;
+					}
+
+					bool pass = false;
+					for (long long j = 0; j < item.size(); ++j) {
+						if (EqualFunc(x.global, x.global->GetItemList(item[j]), x.ut->GetItemList(it_count), item[j],
+							x.dir, vm)) {
+							pass = true;
+							break;
+						}
+					}
+					if (!pass) {
+						return false;
+					}
+				}
+				else if (x.ut->IsItemList(i) && !x.ut->GetItemList(it_count).GetName().empty() && !x.ut->GetItemList(it_count).GetName()._Starts_with("@"sv)) {
+					// chk exist all case of value?
+					auto item = x.global->GetItemIdx(x.ut->GetItemList(it_count).GetName());
+					// no exist -> return false;
+					if (item.empty()) {
+						// LOG....
+						return false;
+					}
+
+					bool pass = false;
+
+					for (long long j = 0; j < item.size(); ++j) {
+						if (EqualFunc(x.global, x.global->GetItemList(item[j]), x.ut->GetItemList(it_count), item[j],
+							x.dir, vm)) {
+							pass = true;
+							break;
+						}
+					}
+					if (!pass) {
+						return false;
+					}
+
+				}
+				else if (x.ut->IsUserTypeList(i) && !x.ut->GetUserTypeList(ut_count)->GetName()._Starts_with("@"sv)) {
+					// chk all case exist of @.
+					// no exist -> return false;
+					if (x.ut->GetUserTypeList(ut_count)->GetName()._Starts_with("$"sv)) {
+						ut_count++;
+						count++;
+						continue;
+					}
+
+					auto usertype = x.global->GetUserTypeItemIdx(x.ut->GetUserTypeList(ut_count)->GetName());
+
+					if (usertype.empty()) {
+						return false;
+					}
+
+					ut_count++;
+					count++;
+
+					for (long long j = 0; j < usertype.size(); ++j) {
+						que.push(UtInfo(x.global->GetUserTypeList(usertype[j]), x.ut->GetUserTypeList(ut_count - 1),
+							x.dir));
+					}
+
+					continue;
+				}
+
+				if (x.ut->IsItemList(i)) {
+					it_count++;
+				}
+				else {
+					ut_count++;
+				}
+				count++;
+			}
+		}
+
+		return true;
+	}
+
+	bool _RemoveFunc(clau_parser::UserType* global, clau_parser::UserType* insert_ut, VM* vm) {
+		std::queue<UtInfo> que;
+		std::string dir = "/.";
+		que.push(UtInfo(global, insert_ut, dir));
+
+		while (!que.empty()) {
+			UtInfo x = que.front();
+			que.pop();
+
+			// find non-@
+			long long ut_count = 0;
+			long long it_count = 0;
+			long long count = 0;
+
+			for (long long i = 0; i < x.ut->GetIListSize(); ++i) {
+				if (x.ut->IsItemList(i) && x.ut->GetItemList(it_count).GetName().empty()
+					&& !x.ut->GetItemList(it_count).Get()._Starts_with("@"sv)) {
+					// chk exist all case of value?
+					auto item = x.global->GetItemIdx("");
+					// no exist -> return false;
+					if (item.empty()) {
+						// LOG....
+						return false;
+					}
+
+					bool pass = false;
+					for (long long j = 0; j < item.size(); ++j) {
+						if (EqualFunc(x.global, x.global->GetItemList(item[j]), x.ut->GetItemList(it_count), item[j],
+							x.dir, vm)) {
+							pass = true;
+							break;
+						}
+					}
+					if (!pass) {
+						return false;
+					}
+				}
+				else if (x.ut->IsItemList(i) && !x.ut->GetItemList(it_count).GetName().empty() && !x.ut->GetItemList(it_count).GetName()._Starts_with("@"sv)) {
+					// chk exist all case of value?
+					auto item = x.global->GetItemIdx(x.ut->GetItemList(it_count).GetName());
+					// no exist -> return false;
+					if (item.empty()) {
+						if (x.ut->GetItemList(it_count).Get() == "!%any") {
+							return true;
+						}
+						// LOG....
+						return false;
+					}
+
+					bool pass = false;
+
+					for (long long j = 0; j < item.size(); ++j) {
+						if (EqualFunc(x.global, x.global->GetItemList(item[j]), x.ut->GetItemList(it_count), item[j],
+							x.dir, vm)) {
+							pass = true;
+							break;
+						}
+					}
+					if (!pass) {
+						return false;
+					}
+
+				}
+				else if (x.ut->IsUserTypeList(i) && !x.ut->GetUserTypeList(ut_count)->GetName()._Starts_with("@"sv)) {
+					// chk all case exist of @.
+					// no exist -> return false;
+					if (x.ut->GetUserTypeList(ut_count)->GetName()._Starts_with("$"sv)) {
+						ut_count++;
+						count++;
+						continue;
+					}
+
+					auto usertype = x.global->GetUserTypeItemIdx(x.ut->GetUserTypeList(ut_count)->GetName());
+
+					if (usertype.empty()) {
+						return false;
+					}
+
+					ut_count++;
+					count++;
+
+					for (long long j = 0; j < usertype.size(); ++j) {
+						que.push(UtInfo(x.global->GetUserTypeList(usertype[j]), x.ut->GetUserTypeList(ut_count - 1),
+							x.dir + "/$ut" + std::to_string(usertype[j])));
+					}
+
+					continue;
+				}
+				else if (x.ut->IsUserTypeList(i) && x.ut->GetUserTypeList(ut_count)->GetName() == "@$"sv) {
+					//
+				}
+
+				if (x.ut->IsItemList(i)) {
+					it_count++;
+				}
+				else {
+					ut_count++;
+				}
+				count++;
+			}
+		}
+
+		return true;
+	}
+
+
+	bool _UpdateFunc(clau_parser::UserType* global, clau_parser::UserType* insert_ut, VM* vm) {
+		std::queue<UtInfo> que;
+		std::string dir = "/.";
+		que.push(UtInfo(global, insert_ut, dir));
+
+		while (!que.empty()) {
+			UtInfo x = que.front();
+			que.pop();
+
+
+			// find non-@
+			long long ut_count = 0;
+			long long it_count = 0;
+			long long count = 0;
+
+			for (long long i = 0; i < x.ut->GetIListSize(); ++i) {
+				if (x.ut->IsItemList(i) && x.ut->GetItemList(it_count).GetName().empty()
+					&& !x.ut->GetItemList(it_count).Get()._Starts_with("@"sv)) {
+					// chk exist all case of value?
+					auto item = x.global->GetItemIdx("");
+					// no exist -> return false;
+					if (item.empty()) {
+						// LOG....
+						return false;
+					}
+
+					bool pass = false;
+					for (long long j = 0; j < item.size(); ++j) {
+						if (EqualFunc(x.global, x.global->GetItemList(item[j]), x.ut->GetItemList(it_count), item[j],
+							x.dir, vm)) {
+							pass = true;
+							break;
+						}
+					}
+					if (!pass) {
+						return false;
+					}
+				}
+				else if (x.ut->IsItemList(i) && !x.ut->GetItemList(it_count).GetName().empty() && !x.ut->GetItemList(it_count).GetName()._Starts_with("@"sv)) {
+					// chk exist all case of value?
+					auto item = x.global->GetItemIdx(x.ut->GetItemList(it_count).GetName());
+					// no exist -> return false;
+					if (item.empty()) {
+						// LOG....
+						return false;
+					}
+
+					bool pass = false;
+
+					for (long long j = 0; j < item.size(); ++j) {
+						if (EqualFunc(x.global, x.global->GetItemList(item[j]), x.ut->GetItemList(it_count), item[j],
+							dir, vm)) {
+							pass = true;
+							break;
+						}
+					}
+					if (!pass) {
+						return false;
+					}
+
+				}
+				else if (x.ut->IsUserTypeList(i) && !x.ut->GetUserTypeList(ut_count)->GetName()._Starts_with("@"sv)) {
+					// chk all case exist of @.
+					// no exist -> return false;
+					if (x.ut->GetUserTypeList(ut_count)->GetName()._Starts_with("$"sv)) {
+						ut_count++;
+						count++;
+						continue;
+					}
+
+					auto usertype = x.global->GetUserTypeItemIdx(x.ut->GetUserTypeList(ut_count)->GetName());
+
+					if (usertype.empty()) {
+						return false;
+					}
+
+					ut_count++;
+					count++;
+
+					for (long long j = 0; j < usertype.size(); ++j) {
+						que.push(UtInfo(x.global->GetUserTypeList(usertype[j]), x.ut->GetUserTypeList(ut_count - 1),
+							dir + "$ut" + std::to_string(usertype[j])));
+					}
+
+					continue;
+				}
+
+				if (x.ut->IsItemList(i)) {
+					it_count++;
+				}
+				else {
+					ut_count++;
+				}
+				count++;
+			}
+		}
+
+		return true;
+	}
+
+	// starts with '@' -> insert target
+	// else -> condition target.
+	bool InsertFunc(clau_parser::UserType* global, clau_parser::UserType* insert_ut, VM* vm) {
+		if (!_InsertFunc(global, insert_ut, vm)) {
+			return false;
+		}
+		std::string dir = "/.";
+		std::queue<UtInfo> que;
+		// insert
+		que.push(UtInfo(global, insert_ut, dir));
+
+		while (!que.empty()) {
+			UtInfo x = que.front();
+			que.pop();
+
+			// find non-@
+			long long ut_count = 0;
+			long long it_count = 0;
+			long long count = 0;
+
+			//chk only @  ! - todo
+			for (long long i = 0; i < x.ut->GetIListSize(); ++i) {
+				if (x.ut->IsItemList(i) && x.ut->GetItemList(it_count).GetName().empty()
+					&& x.ut->GetItemList(it_count).Get()._Starts_with("@"sv)) {
+
+					if (x.ut->GetItemList(it_count).Get()._Starts_with("@%event_"sv)) {
+						std::string event_id = x.ut->GetItemList(it_count).Get().substr(8);
+
+						std::unordered_map<std::string, Token> param;
+						Token token;
+						token.SetString("EMPTY_STRING");
+						param["name"] = token;
+						token.SetBool(true);
+						param["is_user_type"] = token;
+
+						std::string result = vm->Run(event_id, global, param)[0].ToString();
+
+						x.global->AddItem("", result);
+					}
+					else {
+						x.global->AddItem("", x.ut->GetItemList(it_count).Get().substr(1));
+					}
+
+					it_count++;
+				}
+				else if (x.ut->IsItemList(i) && x.ut->GetItemList(it_count).GetName()._Starts_with("@"sv)) {
+					if (x.ut->GetItemList(it_count).Get()._Starts_with("%event_"sv)) {
+						std::string event_id = x.ut->GetItemList(it_count).Get().substr(7);
+
+						std::unordered_map<std::string, Token> param;
+						Token token;
+						token.SetString(x.ut->GetItemList(it_count).GetName());
+						param["name"] = token;
+						token.SetBool(true);
+						param["is_user_type"] = token;
+
+						std::string result = vm->Run(event_id, global, param)[0].ToString();
+
+						x.global->AddItem(
+							x.ut->GetItemList(it_count).GetName().substr(1),
+							result);
+					}
+					else {
+						x.global->AddItem(
+							x.ut->GetItemList(it_count).GetName().substr(1),
+							x.ut->GetItemList(it_count).Get());
+					}
+					it_count++;
+				}
+				else if (x.ut->IsUserTypeList(i) && x.ut->GetUserTypeList(ut_count)->GetName()._Starts_with("@"sv)) {
+					x.global->LinkUserType(x.ut->GetUserTypeList(ut_count));
+					x.ut->GetUserTypeList(ut_count)->SetName(x.ut->GetUserTypeList(ut_count)->GetName().substr(1));
+					x.ut->GetUserTypeList(ut_count) = nullptr;
+
+					x.ut->RemoveUserTypeList(ut_count);
+					count--;
+					i--;
+				}
+				else if (x.ut->IsUserTypeList(i) && !x.ut->GetUserTypeList(ut_count)->GetName()._Starts_with("@"sv)) {
+					if (x.ut->GetUserTypeList(ut_count)->GetName()._Starts_with("$"sv)) {
+						auto temp = x.ut->GetUserTypeList(ut_count)->GetName();
+						auto name = temp.substr(1);
+
+						if (name.empty()) {
+
+							for (long long j = 0; j < x.global->GetUserTypeListSize(); ++j) {
+								if (_InsertFunc(x.global->GetUserTypeList(j), x.ut->GetUserTypeList(ut_count), vm)) {
+									que.push(UtInfo(x.global->GetUserTypeList(j), x.ut->GetUserTypeList(ut_count)
+										, x.dir + "/$ut" + std::to_string(j)
+									));
+								}
+							}
+						}
+						else {
+
+							auto usertype = x.global->GetUserTypeItemIdx(name);
+
+							for (long long j = 0; j < usertype.size(); ++j) {
+								if (_InsertFunc(x.global->GetUserTypeList(usertype[j]), x.ut->GetUserTypeList(ut_count), vm)) {
+									que.push(UtInfo(x.global->GetUserTypeList(usertype[j]), x.ut->GetUserTypeList(ut_count),
+										x.dir + "/$ut" + std::to_string(usertype[j])));
+								}
+							}
+						}
+					}
+					else {
+						auto usertype = x.global->GetUserTypeItemIdx(x.ut->GetUserTypeList(ut_count)->GetName());
+
+						for (long long j = 0; j < usertype.size(); ++j) {
+							//if (_InsertFunc(x.global->GetUserTypeList(usertype[j]), x.ut->GetUserTypeList(ut_count), eventUT)) {
+							que.push(UtInfo(x.global->GetUserTypeList(usertype[j]), x.ut->GetUserTypeList(ut_count),
+								x.dir + "/$ut" + std::to_string(usertype[j])));
+							//}
+						}
+					}
+					ut_count++;
+				}
+				else if (x.ut->IsUserTypeList(i)) {
+					ut_count++;
+				}
+				else {
+					it_count++;
+				}
+
+				count++;
+			}
+		}
+
+		return true;
+	}
+
+	bool RemoveFunc(clau_parser::UserType* global, clau_parser::UserType* insert_ut, VM* vm) {
+		if (!_RemoveFunc(global, insert_ut, vm)) {
+			return false;
+		}
+		std::string dir = "/.";
+		std::queue<UtInfo> que;
+		// insert
+		que.push(UtInfo(global, insert_ut, dir));
+
+		while (!que.empty()) {
+			UtInfo x = que.front();
+			que.pop();
+
+			// find non-@
+			long long ut_count = x.ut->GetUserTypeListSize() - 1;
+			long long it_count = x.ut->GetItemListSize() - 1;
+			long long count = x.ut->GetIListSize() - 1;
+
+			//chk only @  ! - todo
+			for (long long i = x.ut->GetIListSize() - 1; i >= 0; --i) {
+				if (x.ut->IsItemList(i) && x.ut->GetItemList(it_count).GetName().empty()
+					&& x.ut->GetItemList(it_count).Get()._Starts_with("@"sv)) {
+
+					if (x.ut->GetItemList(it_count).Get()._Starts_with("@%event_"sv)) {
+						std::string event_id = x.ut->GetItemList(it_count).Get().substr(8);
+
+						auto temp = x.global->GetItemIdx("");
+
+						for (long long j = 0; j < temp.size(); ++j) {
+							std::unordered_map<std::string, Token> param;
+
+							Token token;
+							token.SetString("EMPTY_STRING");
+							param["name"] = token;
+							token.SetString(x.global->GetItemList(temp[j]).Get());
+							param["value"] = token;
+							token.SetBool(false);
+							param["is_user_type"] = token;
+
+							std::string result = vm->Run(event_id, global, param)[0].ToString();
+
+
+							if (result == "TRUE"sv) { //x.ut->GetItemList(it_count).Get().substr(1)) {
+								x.global->RemoveItemList(temp[j]);
+							}
+						}
+					}
+					else {
+						x.global->RemoveItemList("", x.ut->GetItemList(it_count).Get().substr(1));
+					}
+					it_count--;
+					//x.global->AddItemType(clau_parser::ItemType<std::string>("", x.ut->GetItemList(it_count).Get().substr(1)));
+				}
+				else if (x.ut->IsItemList(i) && x.ut->GetItemList(it_count).GetName()._Starts_with("@"sv)) {
+					//x.global->AddItemType(clau_parser::ItemType<std::string>(
+					//	x.ut->GetItemList(it_count).GetName().substr(1),
+					//	x.ut->GetItemList(it_count).Get()));
+					if (x.ut->GetItemList(it_count).Get()._Starts_with("%event_"sv)) {
+						std::string event_id = x.ut->GetItemList(it_count).Get().substr(7);
+
+						auto name = x.ut->GetItemList(it_count).GetName().substr(1);
+						auto temp = x.global->GetItemIdx(name);
+
+						if (name._Starts_with("&"sv) && name.size() >= 2) {
+							long long idx = std::stoll(name.substr(1));
+
+							if (idx < 0 || idx >= x.global->GetItemListSize()) { // .size()) {
+								return false;
+							}
+							auto valName = x.ut->GetItemList(it_count).Get();
+
+							std::unordered_map<std::string, Token> param;
+							Token token;
+							token.SetString(name);
+							param["name"] = token;
+							token.SetString(x.global->GetItemList(idx).Get());
+							param["value"] = token;
+							token.SetBool(false);
+							param["is_user_type"] = token;
+
+							std::string result = vm->Run(event_id, global, param)[0].ToString();
+
+
+							if (result == "TRUE"sv) {
+								x.global->RemoveItemList(idx);
+							}
+						}
+						else {
+							for (long long j = 0; j < temp.size(); ++j) {
+								std::unordered_map<std::string, Token> param;
+								Token token;
+								token.SetString(name);
+								param["name"] = token;
+								token.SetString(x.global->GetItemList(temp[j]).Get());
+								param["value"] = token;
+								token.SetBool(false);
+								param["is_user_type"] = token;
+
+								std::string result = vm->Run(event_id, global, param)[0].ToString();
+
+
+								if (result == "TRUE"sv) {
+									x.global->RemoveItemList(temp[j]);
+								}
+							}
+						}
+					}
+					else {
+						x.global->RemoveItemList(x.ut->GetItemList(it_count).GetName().substr(1), x.ut->GetItemList(it_count).Get());
+					}
+
+					it_count--;
+				}
+				else if (x.ut->IsUserTypeList(i) && x.ut->GetUserTypeList(ut_count)->GetName()._Starts_with( "@"sv)) {
+					if (x.ut->GetUserTypeList(ut_count)->GetName() == "@$"sv) {
+						for (long long j = x.global->GetUserTypeListSize() - 1; j >= 0; --j) {
+							if (_RemoveFunc(x.global->GetUserTypeList(j), x.ut->GetUserTypeList(ut_count), vm)) {
+								delete[] x.global->GetUserTypeList(j);
+								x.global->GetUserTypeList(j) = nullptr;
+								x.global->RemoveUserTypeList(j);
+							}
+						}
+					}
+					else {
+						auto usertype = x.global->GetUserTypeItemIdx(x.ut->GetUserTypeList(ut_count)->GetName().substr(1));
+
+						for (long long j = usertype.size() - 1; j >= 0; --j) {
+							if (_RemoveFunc(x.global->GetUserTypeList(usertype[j]), x.ut->GetUserTypeList(ut_count), vm)) {
+								x.global->RemoveUserTypeList(usertype[j]);
+							}
+						}
+					}
+					ut_count--;
+				}
+				else if (x.ut->IsUserTypeList(i) && false == x.ut->GetUserTypeList(ut_count)->GetName()._Starts_with("@"sv)) {
+					if (x.ut->GetUserTypeList(ut_count)->GetName()._Starts_with("$"sv)) {
+						auto temp = x.ut->GetUserTypeList(ut_count)->GetName();
+						auto name = temp.substr(1);
+
+						if (name.empty()) {
+
+							for (long long j = 0; j < x.global->GetUserTypeListSize(); ++j) {
+								if (_InsertFunc(x.global->GetUserTypeList(j), x.ut->GetUserTypeList(ut_count), vm)) {
+									que.push(UtInfo(x.global->GetUserTypeList(j), x.ut->GetUserTypeList(ut_count)
+										, x.dir + "/$ut" + std::to_string(j)
+									));
+								}
+							}
+						}
+						else {
+							auto usertype = x.global->GetUserTypeItemIdx(name);
+
+							for (long long j = 0; j < usertype.size(); ++j) {
+								if (_InsertFunc(x.global->GetUserTypeList(usertype[j]), x.ut->GetUserTypeList(ut_count), vm)) {
+									que.push(UtInfo(x.global->GetUserTypeList(usertype[j]), x.ut->GetUserTypeList(ut_count),
+										x.dir + "/$ut" + std::to_string(usertype[j])));
+								}
+							}
+						}
+					}
+					else {
+						auto usertype = x.global->GetUserTypeItemIdx(x.ut->GetUserTypeList(ut_count)->GetName());
+
+						for (long long j = 0; j < usertype.size(); ++j) {
+							//if (_RemoveFunc(x.global->GetUserTypeList(usertype[j]), x.ut->GetUserTypeList(ut_count), eventUT)) {
+							que.push(UtInfo(x.global->GetUserTypeList(usertype[j]), x.ut->GetUserTypeList(ut_count),
+								x.dir + "/$ut" + std::to_string(usertype[j])));
+							//}
+						}
+					}
+
+					ut_count--;
+				}
+				else if (x.ut->IsUserTypeList(i)) {
+					ut_count--;
+				}
+				else if (x.ut->IsItemList(i)) {
+					it_count--;
+				}
+
+				count--;
+			}
+		}
+
+		return true;
+	}
+
+	bool UpdateFunc(clau_parser::UserType* global, clau_parser::UserType* insert_ut, VM* vm) {
+		if (!_UpdateFunc(global, insert_ut, vm)) {
+			return false;
+		}
+		std::string dir = "/.";
+		std::queue<UtInfo> que;
+		// insert
+		que.push(UtInfo(global, insert_ut, dir));
+
+		while (!que.empty()) {
+			UtInfo x = que.front();
+			que.pop();
+
+			// find non-@
+			long long ut_count = 0;
+			long long it_count = 0;
+			long long count = 0;
+
+			//chk only @  ! - todo
+			for (long long i = 0; i < x.ut->GetIListSize(); ++i) {
+				if (x.ut->IsItemList(i) && x.ut->GetItemList(it_count).GetName().empty()
+					&& x.ut->GetItemList(it_count).Get()._Starts_with( "@"sv)) {
+					// think @&0 = 3 # 0 <- index, 3 <- value.
+					//x.global->GetItemList(0).Set(0, x.ut->GetItemList(it_count).Get());
+				}
+				else if (x.ut->IsItemList(i) && x.ut->GetItemList(it_count).GetName()._Starts_with( "@"sv)) {
+					if (x.ut->GetItemList(it_count).Get()._Starts_with( "%event_"sv)) {
+						std::string event_id = x.ut->GetItemList(it_count).Get().substr(7);
+
+						std::string name = x.ut->GetItemList(it_count).GetName().substr(1);
+						auto position = x.global->GetItemIdx(name);
+
+						{
+							std::string name = x.ut->GetItemList(it_count).GetName().substr(1);
+							if (name._Starts_with("&"sv) && name.size() >= 2) {
+								long long idx = std::stoll(name.substr(1));
+								if (idx < 0 || idx >= x.global->GetItemListSize()) {
+									return false; // error
+								}
+								else {
+									position.clear();
+									position.push_back(idx);
+								}
+							}
+
+							for (long long j = 0; j < position.size(); ++j) {
+								std::unordered_map<std::string, Token> param;
+								Token token;
+								token.SetString(x.ut->GetItemList(it_count).GetName().substr(1));
+								param["name"] = token;
+								token.SetString(x.global->GetItemList(position[j]).Get());
+								param["value"] = token;
+								token.SetBool(false);
+								param["is_user_type"] = token;
+
+								std::string result = vm->Run(event_id, global, param)[0].ToString();
+
+								x.global->GetItemList(position[j]).Set(0, result);
+
+							}
+						}
+					}
+					else {
+						std::string name = x.ut->GetItemList(it_count).GetName().substr(1);
+						if (name._Starts_with("&"sv) && name.size() >= 2) {
+							long long idx = std::stoll(name.substr(1));
+							if (idx < 0 || idx >= x.global->GetItemListSize()) {
+								return false;
+							}
+							auto value = x.ut->GetItemList(it_count).Get();
+							x.global->GetItemList(idx).Set(0, value);
+						}
+						else {
+							x.global->SetItem(std::string(x.ut->GetItemList(it_count).GetName().substr(1)),
+								x.ut->GetItemList(it_count).Get());
+						}
+					}
+				}
+				else if (x.ut->IsUserTypeList(i) && !x.ut->GetUserTypeList(ut_count)->GetName()._Starts_with( "@"sv)) {
+					if (x.ut->GetUserTypeList(ut_count)->GetName()._Starts_with("$"sv)) {
+						auto temp = x.ut->GetUserTypeList(ut_count)->GetName();
+						auto name = temp.substr(1);
+
+						if (name.empty()) {
+
+							for (long long j = 0; j < x.global->GetUserTypeListSize(); ++j) {
+								if (_InsertFunc(x.global->GetUserTypeList(j), x.ut->GetUserTypeList(ut_count), vm)) {
+									que.push(UtInfo(x.global->GetUserTypeList(j), x.ut->GetUserTypeList(ut_count)
+										, x.dir + "/$ut" + std::to_string(j)
+									));
+								}
+							}
+						}
+						else {
+
+							auto usertype = x.global->GetUserTypeItemIdx(name);
+
+							for (long long j = 0; j < usertype.size(); ++j) {
+								if (_InsertFunc(x.global->GetUserTypeList(usertype[j]), x.ut->GetUserTypeList(ut_count), vm)) {
+									que.push(UtInfo(x.global->GetUserTypeList(usertype[j]), x.ut->GetUserTypeList(ut_count),
+										x.dir + "/$ut" + std::to_string(usertype[j])));
+								}
+							}
+						}
+					}
+					else {
+						auto usertype = x.global->GetUserTypeItemIdx(x.ut->GetUserTypeList(ut_count)->GetName());
+
+						for (long long j = 0; j < usertype.size(); ++j) {
+							//if (_UpdateFunc(x.global->GetUserTypeList(usertype[j]), x.ut->GetUserTypeList(ut_count), eventUT)) {
+							que.push(UtInfo(x.global->GetUserTypeList(usertype[j]), x.ut->GetUserTypeList(ut_count),
+								x.dir + "/$ut" + std::to_string(usertype[j])));
+							//	}
+						}
+					}
+				}
+
+				if (x.ut->IsItemList(i)) {
+					it_count++;
+				}
+				else {
+					ut_count++;
+				}
+				count++;
+			}
+		}
+
+		return true;
+	}
 	std::pair<bool, std::vector<clau_parser::UserType*> > _Find(clau_parser::UserType* global, const std::string& _position) /// option, option_offset
 	{
 		std::string position = _position;
@@ -508,8 +1347,10 @@ private:
 public:
 
 	
-	void Run(const std::string& id, clau_parser::UserType* global) {
+	std::vector<Token> Run(const std::string& id, clau_parser::UserType* global, 
+					std::unordered_map<std::string, Token> parameter = std::unordered_map<std::string, Token>()) {
 		Event main = _event_list[id];
+		main.parameter = parameter;
 		std::vector<Token> token_stack;
 		std::vector<Event> _stack;
 
@@ -517,6 +1358,7 @@ public:
 		int count = 0;
 		std::string dir = "";
 
+		std::vector<Token> return_value;
 
 		while (!_stack.empty()) {
 			auto& x = _stack.back();
@@ -541,6 +1383,29 @@ public:
 				token_stack.push_back(token);
 			}
 				break;
+			case FUNC::FUNC_QUERY:
+			{
+				x.now++;
+
+				auto ut = (*x.input)[x.event_data[x.now]];
+				auto dir = token_stack.back(); token_stack.pop_back();
+
+				auto workspace = this->Find(global, dir.ToString())[0].workspace;
+				
+
+				for (int i = 1; i < ut.ut_val->GetUserTypeListSize(); ++i) {
+					if (ut.ut_val->GetUserTypeList(i)->GetName() == "$insert"sv) {
+						this->InsertFunc(workspace.reader->GetUT(), ut.ut_val->GetUserTypeList(i), this);
+					}
+					else if (ut.ut_val->GetUserTypeList(i)->GetName() == "$update"sv) {
+						this->UpdateFunc(workspace.reader->GetUT(), ut.ut_val->GetUserTypeList(i), this);
+					}
+					else if (ut.ut_val->GetUserTypeList(i)->GetName() == "$delete"sv) {
+						this->RemoveFunc(workspace.reader->GetUT(), ut.ut_val->GetUserTypeList(i), this);
+					}
+				}
+			}
+			break;
 			case FUNC::FUNC_GET:
 			{
 				auto token = token_stack.back();
@@ -653,8 +1518,21 @@ public:
 				break;
 			}
 			case FUNC::FUNC_RETURN:
+				x.now++;
+				
 				//std::cout << "return .... \n";)
+				if (_stack.size() == 1) {
+					std::vector<Token> temp;
+					int count = x.event_data[x.now];
 
+					for(int i=0; i < count; ++i) {
+						temp.push_back(token_stack.back());
+						token_stack.pop_back();
+					}
+					for (int i = 0; i < temp.size(); ++i) {
+						return_value.push_back(temp[i]);
+					}
+				}
 				_stack.pop_back();
 				break;
 			case FUNC::CONSTANT:
@@ -730,23 +1608,7 @@ public:
 
 							break;
 						}
-						else if (value.IsString()) {
-							//if (value.ToString()._Starts_with("$parameter.")) {
-							//	value = x.parameter[value.ToString().substr(11)];
-
-							//	if (value.ToString()._Starts_with("$return_value")) {
-							//		value = x.return_value[x.return_value_now];
-							//	}
-						//	}
-							//else if (value.ToString()._Starts_with("$local.")) {
-							//	value = x.parameter[value.ToString().substr(7)];
-
-								//	if (value.ToString()._Starts_with("$return_value")) {
-								//		value = x.return_value[x.return_value_now];
-								//	}
-							//}
-						}
-
+						
 						e.parameter[name.ToString()] = std::move(value); // name.ToString()
 					}
 
@@ -1115,6 +1977,8 @@ public:
 			}
 			x.now++;
 		}
+
+		return return_value;
 	}
 
 	void Register(Event e) {
@@ -1343,15 +2207,32 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 				call_flag = true;
 			}
 			
-			_MakeByteCode(ut->GetUserTypeList(ut_count), e);
+			if (name != "$query"sv) {
+				_MakeByteCode(ut->GetUserTypeList(ut_count), e);
+			}
 
 			if (!ut->GetUserTypeList(ut_count)->GetName().empty()) {
 				if (name._Starts_with("$"sv)) {
-					Token token(ut);
+					Token token;
 
 					token.SetFunc(); // | Token::Type::UserType
 
-					if (name == "$clone"sv) {
+					if (name == "$query"sv) {
+						_MakeByteCode(ut->GetUserTypeList(ut_count)->GetUserTypeList(0), e);
+
+						token.func = FUNC::FUNC_QUERY;
+
+						e->event_data.push_back(FUNC::FUNC_QUERY);
+
+						{
+							Token temp;
+							temp.ut_val = wiz::SmartPtr<clau_parser::UserType>(new clau_parser::UserType(*ut->GetUserTypeList(ut_count)));
+							
+							e->input->push_back(temp);
+							e->event_data.push_back(e->input->size() - 1);
+						}
+					}
+					else if (name == "$clone"sv) {
 						token.func = FUNC::FUNC_CLONE;
 
 						e->event_data.push_back(FUNC::FUNC_CLONE);
@@ -1483,6 +2364,8 @@ void _MakeByteCode(clau_parser::UserType* ut, Event* e) {
 						token.func = FUNC::FUNC_RETURN;
 
 						e->event_data.push_back(FUNC::FUNC_RETURN);
+
+						e->event_data.push_back(ut->GetUserTypeList(ut_count)->GetIListSize());
 					}
 					else if (name == "$return_value"sv) {
 						token.func = FUNC::FUNC_RETURN_VALUE;

@@ -24,6 +24,15 @@ Test = {
 	}
 }
 
+data = {
+	
+}
+
+Event = { id = test2 
+	$print = { @/./x@$get \ns }
+	$return = { 1 }
+}
+
 Event = { id = main
 	
 	$local = { x }
@@ -42,8 +51,64 @@ Event = { id = main
 	
 	$load_data = { @$local.x@$get "C:\Users\vztpv\Desktop\Clau\ClauParser\ClauParser\input.eu4" }
 	
-	# call
+	## call
 	$call = { id = iterate workspace = @$local.x@$get@$clone  event = test } # @$return_value ??
+	
+	$query = {
+		workspace = { /data }
+		$insert = {
+			@x = 15
+			@y = {
+				z = 0
+			} 
+			@"a" = 3
+
+			@provinces = {
+				-1 = {
+					x = 0
+				}
+				-2 = {
+					x = 1
+				}
+			}
+		}
+		$insert = {
+			x = 15
+
+			provinces = {
+				$ = {
+					x = 0
+					@y = wow2
+				}
+			}
+		}
+		$update = {
+			#@x = 2 # @ : target, 2 : set value
+			"a" = 3 # condition
+			y = {
+				@z = 4 # @ : target.
+			}
+			provinces = {
+				$ = {
+					x = 0
+					@y = %event_test2 # %event_test2%'x = /./x' <- support?
+				}
+			}
+		}
+		
+		#$delete = {
+		#	@x = 1 # @ : remove object., if value is 1 then remove
+		#	"a" = 3 # condition.
+		#	y = {
+		#		@z = %any # %any : condition - always.
+		#	}
+		#	provinces = {
+		#		@$ = { # $ : all usertype( array or object or mixed )
+		#			x = 1 # condition.
+		#		}
+		#	}
+		#}
+	}
 }
 
 Event = { id = iterate
